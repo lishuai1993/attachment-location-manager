@@ -1,6 +1,7 @@
 import { Modal, Notice, Setting, setIcon } from "obsidian";
 import AttachmentManagementPlugin from "../main";
 import { ArrangeHandler, RearrangeType } from "../arrange";
+import { error, info } from "../lib/logger";
 import { t } from "../i18n/index";
 
 export class ConfirmModal extends Modal {
@@ -49,10 +50,16 @@ export class ConfirmModal extends Modal {
           .setButtonText(t("confirm.continue"))
           .setWarning()
           .onClick(() => {
+            info("ui:confirm", "rearrange all links confirmed", {
+              autoRenameAttachment: this.plugin.settings.autoRenameAttachment,
+            });
             new ArrangeHandler(this.plugin.settings, this.plugin.app)
               .rearrangeAttachment(RearrangeType.LINKS)
               .then(() => new Notice(t("notices.arrangeCompleted")))
-              .catch((err) => new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`))
+              .catch((err) => {
+                error("ui:confirm", "rearrange all links failed", { err: err });
+                new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`);
+              })
               .finally(() => this.close());
           }),
       );

@@ -6,8 +6,44 @@ export const zhCn = {
     cancel: "取消",
   },
 
+  order: {
+    prefix: "适用顺序：",
+    file: "本文件覆盖",
+    folder: "最近上层文件夹覆盖",
+    global: "全局默认",
+    separator: " ▶ ",
+  },
+
+  layer: {
+    global: "全局默认",
+    file: "本文件的四项",
+    folder: "本文件夹的四项",
+  },
+
+  exception: {
+    addGlobal: "添加全局扩展名例外",
+    addFile: "添加本文件的扩展名例外",
+    addFolder: "添加本文件夹的扩展名例外",
+    section: {
+      title: "例外：下列扩展名不走上面的值",
+      desc: "例外只改写被自定义的字段，其余跟随本层。",
+    },
+    extension: {
+      name: "扩展名",
+      desc: "正则匹配附件的扩展名，列表自上而下首个命中生效。",
+      placeholder: "pdf|docx?",
+    },
+    inherit: "继承本层",
+    customize: "自定义",
+    inheritValue: "继承：{value}",
+    emptyValue: "（空）",
+    remove: "删除本例外",
+    rootFolderDesc: "仅当上面的「附件保存根路径」不是「复制 Obsidian 设置」时使用。",
+  },
+
   settings: {
-    title: "附件管理设置",
+    title: "全局附件设置",
+    others: "其它设置",
     rootPath: {
       name: "附件保存根路径",
       desc: "选择附件的根路径",
@@ -18,15 +54,15 @@ export const zhCn = {
       },
     },
     rootFolder: {
-      name: "根文件夹",
-      desc: "新附件的根文件夹",
+      name: "附件保存根文件夹",
+      desc: "新附件的根文件夹。输入时会提示仓库内已有的文件夹。",
     },
     attachmentPath: {
-      name: "附件路径",
-      desc: "附件在根文件夹中的路径，可用变量 ${notepath}、${notename}、${parent}",
+      name: "附件文件夹",
+      desc: "附件在根文件夹中的文件夹，可用变量 ${notepath}、${notename}、${parent}",
     },
     attachmentFormat: {
-      name: "附件格式",
+      name: "附件名称",
       desc: "定义如何命名附件文件，可用变量 ${date}、${notename}、${md5} 和 ${originalname}。",
     },
     dateFormat: {
@@ -37,22 +73,6 @@ export const zhCn = {
     autoRename: {
       name: "自动重命名附件",
       desc: "当您重命名对应 md/canvas 文件所在的文件夹/文件名时，自动重命名附件文件夹/文件名。",
-    },
-    extensionOverride: {
-      name: "扩展名覆盖",
-      desc: "如果您想要对特定扩展名的附件进行自动重命名（例如 pdf 或 zip),请使用扩展名覆盖。",
-      addButton: "添加扩展名覆盖",
-      extension: {
-        name: "扩展名",
-        desc: "要覆盖的扩展名",
-        placeholder: "pdf|docx?",
-      },
-      tooltips: {
-        remove: "移除扩展名覆盖",
-        edit: "编辑扩展名覆盖",
-        save: "保存扩展名覆盖",
-      },
-      saveNotice: "已保存扩展名覆盖",
     },
     excludeExtension: {
       name: "排除扩展名模式",
@@ -67,47 +87,25 @@ export const zhCn = {
       name: "排除子路径",
       desc: "如果您还想排除上面提供的文件夹路径的所有子文件夹，请打开此选项。",
     },
+    diagnostics: {
+      name: "诊断",
+      enable: {
+        name: "写入诊断日志",
+        desc: "将诊断日志写入 {path} 以便排查问题。WARN 与 ERROR 始终记录；开启后还会记录 INFO 与 TRACE。插件每次重载都会将日志轮转为 log.txt.bak 并清空当前文件。",
+      },
+    },
   },
 
   override: {
-    title: "覆盖设置",
-    menuTitle: "覆盖附件设置",
-    addExtensionOverrides: "添加扩展名覆盖",
-    extension: {
-      name: "扩展名",
-      desc: "要覆盖的扩展名",
-      placeholder: "pdf",
-    },
+    title: "覆盖全局附件设置：{path}",
+    menuTitle: "覆盖全局附件设置",
     buttons: {
-      reset: "重置",
-      submit: "提交",
+      reset: "移除本条目覆盖",
+      submit: "确认",
     },
     notifications: {
-      reset: "已重置 {path} 的附件设置",
-      overridden: "已覆盖 {path} 的附件设置",
-    },
-  },
-
-  extensionOverride: {
-    title: "扩展名覆盖设置",
-    rootPath: {
-      name: "附件保存根路径",
-      desc: "选择此扩展名的附件根路径",
-    },
-    rootFolder: {
-      name: "根文件夹",
-      desc: "此扩展名的根文件夹",
-    },
-    attachmentPath: {
-      name: "附件路径",
-      desc: "此扩展名在根文件夹中的附件路径",
-    },
-    attachmentFormat: {
-      name: "附件格式",
-      desc: "定义此扩展名的附件文件命名方式",
-    },
-    buttons: {
-      save: "保存",
+      reset: "已移除 {path} 的覆盖",
+      overridden: "已为 {path} 覆盖全局附件设置",
     },
   },
 
@@ -119,11 +117,11 @@ export const zhCn = {
 
   notices: {
     fileExcluded: "{path} 已被排除",
-    overrideRemoved: "已移除 {path} 的覆盖设置",
+    overrideRemoved: "已移除 {path} 的覆盖",
     fileRenamed: "已将 {from} 重命名为 {to}",
     filesRenamedBatch: "已重命名 {count} 个附件",
     arrangeCompleted: "整理完成",
-    resetAttachmentSetting: "已重置 {path} 的附件设置",
+    resetAttachmentSetting: "已移除 {path} 的覆盖",
     error: {
       unknownError: "发生未知错误",
     },
@@ -132,21 +130,22 @@ export const zhCn = {
   commands: {
     rearrangeAllLinks: "重新整理所有链接的附件",
     rearrangeActiveLinks: "重新整理链接的附件",
-    resetOverrideSetting: "重置覆盖设置",
+    overrideSetting: "覆盖全局附件设置",
+    resetOverrideSetting: "移除本条目覆盖：{path}",
     clearUnusedStorage: "清理未使用的原始文件名存储",
   },
 
   errors: {
-    canvasNotSupported: "不支持将 Canvas 作为扩展覆盖。",
-    markdownNotSupported: "不支持将 Markdown 作为扩展覆盖。",
-    extensionEmpty: "扩展覆盖不能为空。",
-    duplicateExtension: "重复的扩展覆盖。",
-    excludedExtension: "扩展覆盖不能是被排除的扩展。",
-    attachFormatEmpty: "附件格式不能为空。",
-    attachFormatIllegalChar: "附件格式包含非法文件名字符：{char}",
-    attachFormatUnknownVariable: "附件格式中存在未知变量：{name}",
-    attachmentPathEmpty: "附件路径不能为空。",
-    attachmentPathIllegalChar: "附件路径包含非法文件名字符：{char}",
-    attachmentPathUnknownVariable: "附件路径中存在未知变量：{name}",
+    canvasNotSupported: "不支持将 Canvas 作为扩展例外。",
+    markdownNotSupported: "不支持将 Markdown 作为扩展例外。",
+    extensionEmpty: "扩展例外不能为空。",
+    duplicateExtension: "重复的扩展例外。",
+    excludedExtension: "扩展例外不能是被排除的扩展。",
+    attachFormatEmpty: "附件名称不能为空。",
+    attachFormatIllegalChar: "附件名称包含非法文件名字符：{char}",
+    attachFormatUnknownVariable: "附件名称中存在未知变量：{name}",
+    attachmentPathEmpty: "附件文件夹不能为空。",
+    attachmentPathIllegalChar: "附件文件夹包含非法文件名字符：{char}",
+    attachmentPathUnknownVariable: "附件文件夹中存在未知变量：{name}",
   },
 } as const satisfies LocaleShape<typeof en>;

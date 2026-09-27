@@ -1,11 +1,11 @@
-import { getExtensionOverrideSetting } from "../model/extensionOverride";
+import { getExtensionOverrideSetting, resolveExtensionFields } from "./extension";
 import { AttachmentManagementPluginSettings, AttachmentPathSettings, OriginalNameStorage } from "../settings/settings";
 import { SETTINGS_VARIABLES_ORIGINALNAME } from "./constant";
 
 export function containsOriginalNameVariable(setting: AttachmentPathSettings, ext: string): boolean {
   const { extSetting } = getExtensionOverrideSetting(ext, setting);
   if (extSetting !== undefined) {
-    return extSetting.attachFormat.includes(SETTINGS_VARIABLES_ORIGINALNAME);
+    return resolveExtensionFields(setting, extSetting).attachFormat.includes(SETTINGS_VARIABLES_ORIGINALNAME);
   }
   return setting.attachFormat.includes(SETTINGS_VARIABLES_ORIGINALNAME);
 }

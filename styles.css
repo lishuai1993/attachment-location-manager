@@ -3,13 +3,63 @@
 This CSS file will be included with your plugin, and
 available in the app when your plugin is enabled.
 
-If your plugin does not need CSS, delete this file.
-
 */
-.attach_management_sub_setting {
-  padding-left: 2em;
-}
-.attach_management_sub_setting + .attach_management_sub_setting {
+
+/* 设置页的各级标题与下方内容左对齐：Obsidian 给 .vertical-tab-content 的标题留了左右 16px 内边距，
+   而设置项的边框盒子是从 0 起算的，标题因此比内容右移一格。
+   选择器必须写成两段以压过 Obsidian 的 .vertical-tab-content h2（1 类 + 1 元素 = 0,1,1）。 */
+.vertical-tab-content .attach_management_tab_heading {
   padding-left: 0;
-  margin-left: 2em;
+}
+
+/* 层容器：只留一个小标题，不加外框——从属关系由顺序与标题文字承担 */
+.attach_management_layer {
+  margin-bottom: 1.5em;
+}
+
+.attach_management_layer_title {
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.75em 0 0;
+}
+
+/* 例外区：区本身不缩进、不加左竖线，直接排在所属层的四项之下；条目的缩进见下方规则 */
+.attach_management_exception_area {
+  margin: 0.5em 0 1em;
+}
+
+.attach_management_exception_head {
+  border-top: none;
+  padding-top: 0.5em;
+}
+
+/* 例外卡片：只留描边、不填底色；圆角与内部每一行取同一个变量，内边距让首行不再顶住描边 */
+.attach_management_exception_card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--setting-items-radius, var(--radius-m));
+  padding: var(--size-4-2, 0.5em);
+  margin: 0.5em 0 0.5em var(--size-4-4, 1em);
+}
+
+/* 添加按钮与卡片一起缩进一层，保持左对齐；「例外」标题不缩进，与上方四项同一条左基准线 */
+.attach_management_exception_area > .setting-item:not(.attach_management_exception_head) {
+  margin-left: var(--size-4-4, 1em);
+}
+
+.attach_management_exception_card .setting-item-control {
+  gap: 0.5em;
+}
+
+/* 顺序图例：当前编辑的那一级直接在链上高亮，不另起一行自述 */
+.attach_management_legend {
+  margin: 0.25em 0 1em;
+}
+
+.attach_management_legend_chain {
+  color: var(--text-muted);
+}
+
+.attach_management_legend_active {
+  color: var(--text-accent);
+  font-weight: 600;
 }

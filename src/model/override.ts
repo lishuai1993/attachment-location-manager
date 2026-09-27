@@ -2,8 +2,10 @@ import { Modal, TFile, TAbstractFile, Setting, TFolder, Notice } from "obsidian"
 import { AttachmentPathSettings, DEFAULT_SETTINGS, SETTINGS_TYPES } from "../settings/settings";
 import { SETTINGS_ROOT_OBSFOLDER, SETTINGS_ROOT_INFOLDER, SETTINGS_ROOT_NEXTTONOTE } from "../lib/constant";
 import AttachmentManagementPlugin from "../main";
-import { OverrideExtensionModal } from "./extensionOverride";
+import { createLayerBox, renderExceptionArea, renderOrderLegend } from "../settings/exceptionArea";
+import { attachFolderSuggest } from "../lib/folderSuggest";
 import { debugLog } from "../lib/log";
+import { info } from "../lib/logger";
 import { t } from "../i18n/index";
 
 export class OverrideModal extends Modal {
@@ -16,6 +18,15 @@ export class OverrideModal extends Modal {
     this.plugin = plugin;
     this.file = file;
     this.setting = setting;
+
+    // `extensionOverride` is an array, so the shallow copy the caller makes
+    // (`Object.assign({}, setting)`) still shares it with the source object. Left
+    // alone, every edit in this dialog would write straight into the source list —
+    // the global setting when the target had no override yet — and 移除本条目覆盖
+    // could not undo it. Cloning the entries detaches this dialog from that list.
+    if (setting.extensionOverride !== undefined) {
+      setting.extensionOverride = setting.extensionOverride.map((ext) => ({ ...ext }));
+    }
   }
 
   displaySw(cont: HTMLElement): void {
@@ -34,11 +45,28 @@ export class OverrideModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    contentEl.createEl("h3", {
-      text: t("override.title"),
+    const isFolder = this.file instanceof TFolder;
+
+    info("ui:override", "override modal open", {
+      target: this.file.path,
+      targetType: isFolder ? "folder" : "file",
+      settingType: this.setting.type,
+      saveAttE: this.setting.saveAttE,
+      attachmentRoot: this.setting.attachmentRoot,
+      attachmentPath: this.setting.attachmentPath,
+      attachFormat: this.setting.attachFormat,
+      extOverrideCount: this.setting.extensionOverride?.length ?? 0,
     });
 
-    new Setting(contentEl)
+    contentEl.createEl("h3", {
+      text: t("override.title", { path: this.file.path }),
+    });
+
+    renderOrderLegend(contentEl, isFolder ? "folder" : "file");
+
+    const layer = createLayerBox(contentEl, isFolder ? t("layer.folder") : t("layer.file"));
+
+    new Setting(layer)
       .setName(t("settings.rootPath.name"))
       .setDesc(t("settings.rootPath.desc"))
       .addDropdown((text) =>
@@ -53,21 +81,24 @@ export class OverrideModal extends Modal {
           }),
       );
 
-    new Setting(contentEl)
+    new Setting(layer)
       .setName(t("settings.rootFolder.name"))
       .setDesc(t("settings.rootFolder.desc"))
       .setClass("override_root_folder_set")
-      .addText((text) =>
+      .addText((text) => {
+        attachFolderSuggest(this.plugin.app, text.inputEl, (picked) => {
+          this.setting.attachmentRoot = picked;
+        });
         text
           .setPlaceholder(DEFAULT_SETTINGS.attachPath.attachmentRoot)
           .setValue(this.setting.attachmentRoot)
           .onChange(async (value) => {
             debugLog("override - attachment root:" + value);
             this.setting.attachmentRoot = value;
-          }),
-      );
+          });
+      });
 
-    new Setting(contentEl)
+    new Setting(layer)
       .setName(t("settings.attachmentPath.name"))
       .setDesc(t("settings.attachmentPath.desc"))
       .addText((text) =>
@@ -80,7 +111,7 @@ export class OverrideModal extends Modal {
           }),
       );
 
-    new Setting(contentEl)
+    new Setting(layer)
       .setName(t("settings.attachmentFormat.name"))
       .setDesc(t("settings.attachmentFormat.desc"))
       .addText((text) =>
@@ -93,62 +124,27 @@ export class OverrideModal extends Modal {
           }),
       );
 
-    new Setting(contentEl).addButton((btn) => {
-      btn.setButtonText(t("override.addExtensionOverrides")).onClick(async () => {
-        if (this.setting.extensionOverride === undefined) {
-          this.setting.extensionOverride = [];
-        }
-        this.setting.extensionOverride.push({
-          extension: "",
-          saveAttE: this.setting.saveAttE,
-          attachmentRoot: this.setting.attachmentRoot,
-          attachmentPath: this.setting.attachmentPath,
-          attachFormat: this.setting.attachFormat,
-        });
-        this.onOpen();
-      });
+    renderExceptionArea(layer, {
+      plugin: this.plugin,
+      layer: this.setting,
+      scope: isFolder ? "folder" : "file",
+      // This dialog edits a working copy; it reaches the vault only on 确认.
+      persist: async () => undefined,
     });
-
-    if (this.setting.extensionOverride !== undefined) {
-      this.setting.extensionOverride.forEach((ext) => {
-        new Setting(contentEl)
-          .setName(t("override.extension.name"))
-          .setDesc(t("override.extension.desc"))
-          .setClass("override_extension_set")
-          .addText((text) =>
-            text
-              .setPlaceholder(t("override.extension.placeholder"))
-              .setValue(ext.extension)
-              .onChange(async (value) => {
-                ext.extension = value;
-              }),
-          )
-          .addButton((btn) => {
-            btn.setIcon("trash").onClick(async () => {
-              //get index of extension
-              const index = this.setting.extensionOverride?.indexOf(ext) ?? -1;
-              //remove extension from array
-              this.setting.extensionOverride?.splice(index, 1);
-              this.onOpen();
-            });
-          })
-          .addButton((btn) => {
-            btn.setIcon("pencil").onClick(async () => {
-              new OverrideExtensionModal(this.plugin, ext, (result) => {
-                ext = result;
-              }).open();
-            });
-          });
-      });
-    }
 
     new Setting(contentEl)
       .addButton((btn) => {
         btn.setButtonText(t("override.buttons.reset")).onClick(async () => {
+          const hadExactKey = this.plugin.settings.overridePath[this.file.path] !== undefined;
           this.setting = this.plugin.settings.attachPath;
           delete this.plugin.settings.overridePath[this.file.path];
           await this.plugin.saveSettings();
           await this.plugin.loadSettings();
+          info("ui:override", "override reset from modal", {
+            target: this.file.path,
+            hadExactKey: hadExactKey,
+            keysAfter: Object.keys(this.plugin.settings.overridePath),
+          });
           new Notice(t("override.notifications.reset", { path: this.file.path }));
           this.close();
         });
@@ -163,8 +159,20 @@ export class OverrideModal extends Modal {
             } else if (this.file instanceof TFolder) {
               this.setting.type = SETTINGS_TYPES.FOLDER;
             }
+            const keysBefore = Object.keys(this.plugin.settings.overridePath);
             this.plugin.settings.overridePath[this.file.path] = this.setting;
             await this.plugin.saveSettings();
+            info("ui:override", "override submitted", {
+              target: this.file.path,
+              settingType: this.setting.type,
+              saveAttE: this.setting.saveAttE,
+              attachmentRoot: this.setting.attachmentRoot,
+              attachmentPath: this.setting.attachmentPath,
+              attachFormat: this.setting.attachFormat,
+              extOverrideCount: this.setting.extensionOverride?.length ?? 0,
+              keysBefore: keysBefore,
+              keysAfter: Object.keys(this.plugin.settings.overridePath),
+            });
             debugLog("override - overriding settings:", this.file.path, this.setting);
             new Notice(t("override.notifications.overridden", { path: this.file.path }));
             this.close();

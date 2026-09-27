@@ -6,8 +6,44 @@ export const ja = {
     cancel: "キャンセル",
   },
 
+  order: {
+    prefix: "適用順序：",
+    file: "このファイルの上書き",
+    folder: "直近の上位フォルダの上書き",
+    global: "グローバル既定",
+    separator: " ▶ ",
+  },
+
+  layer: {
+    global: "グローバル既定",
+    file: "このファイルの設定",
+    folder: "このフォルダの設定",
+  },
+
+  exception: {
+    addGlobal: "グローバル拡張子例外を追加",
+    addFile: "このファイルの拡張子例外を追加",
+    addFolder: "このフォルダの拡張子例外を追加",
+    section: {
+      title: "例外：以下の拡張子は上記の値を使用しません",
+      desc: "例外はカスタマイズしたフィールドだけを書き換え、残りはこの階層に従います。",
+    },
+    extension: {
+      name: "拡張子",
+      desc: "添付ファイルの拡張子に一致する正規表現。リストの上から順に、最初に一致したものが有効です。",
+      placeholder: "pdf|docx?",
+    },
+    inherit: "この階層を継承",
+    customize: "カスタマイズ",
+    inheritValue: "継承：{value}",
+    emptyValue: "（空）",
+    remove: "この例外を削除",
+    rootFolderDesc: "上の「添付ファイルの保存先ルートパス」が「Obsidian の設定をコピー」でない場合のみ使用します。",
+  },
+
   settings: {
-    title: "Attachment Management 設定",
+    title: "グローバル添付ファイル設定",
+    others: "その他の設定",
     rootPath: {
       name: "添付ファイルの保存先ルートパス",
       desc: "添付ファイルのルートパスを選択",
@@ -18,15 +54,15 @@ export const ja = {
       },
     },
     rootFolder: {
-      name: "ルートフォルダ",
-      desc: "新しい添付ファイルのルートフォルダ",
+      name: "添付ファイルの保存先ルートフォルダ",
+      desc: "新しい添付ファイルのルートフォルダ。入力中に Vault 内の既存フォルダが候補として表示されます。",
     },
     attachmentPath: {
-      name: "添付ファイルのパス",
-      desc: "ルートフォルダ内の添付ファイルのパス。利用可能な変数：${notepath}、${notename}、${parent}",
+      name: "添付ファイルのフォルダ",
+      desc: "ルートフォルダ内の添付ファイルのフォルダ。利用可能な変数：${notepath}、${notename}、${parent}",
     },
     attachmentFormat: {
-      name: "添付ファイルのフォーマット",
+      name: "添付ファイル名",
       desc: "添付ファイルの名前の付け方を定義します。利用可能な変数：${date}、${notename}、${md5}、${originalname}。",
     },
     dateFormat: {
@@ -37,22 +73,6 @@ export const ja = {
     autoRename: {
       name: "添付ファイルを自動でリネーム",
       desc: "対応する md/canvas ファイルが置かれているフォルダ/ファイルの名前を変更すると、添付ファイルのフォルダ/ファイル名も自動的に変更されます。",
-    },
-    extensionOverride: {
-      name: "拡張子ごとの上書き設定",
-      desc: "特定の拡張子（例：pdf や zip）を持つ添付ファイルを自動リネームしたい場合、拡張子ごとの上書き設定を使用します。",
-      addButton: "拡張子ごとの上書き設定を追加",
-      extension: {
-        name: "拡張子",
-        desc: "上書きする拡張子",
-        placeholder: "pdf|docx?",
-      },
-      tooltips: {
-        remove: "拡張子ごとの上書き設定を削除",
-        edit: "拡張子ごとの上書き設定を編集",
-        save: "拡張子ごとの上書き設定を保存",
-      },
-      saveNotice: "拡張子ごとの上書き設定を保存しました",
     },
     excludeExtension: {
       name: "除外する拡張子のパターン",
@@ -67,47 +87,25 @@ export const ja = {
       name: "サブパスを除外",
       desc: "このオプションをオンにすると、上記で指定したフォルダパスのすべてのサブフォルダも除外されます。",
     },
+    diagnostics: {
+      name: "診断",
+      enable: {
+        name: "診断ログを書き出す",
+        desc: "トラブルシューティング用の診断ログを {path} に書き出します。WARN と ERROR は常に記録され、オンにすると INFO と TRACE も記録されます。プラグインの再読み込みごとにログは log.txt.bak にローテートされ、現在のファイルは消去されます。",
+      },
+    },
   },
 
   override: {
-    title: "上書き設定",
-    menuTitle: "添付ファイル設定を上書き",
-    addExtensionOverrides: "拡張子ごとの上書き設定を追加",
-    extension: {
-      name: "拡張子",
-      desc: "上書きする拡張子",
-      placeholder: "pdf",
-    },
+    title: "グローバル添付ファイル設定を上書き：{path}",
+    menuTitle: "グローバル添付ファイル設定を上書き",
     buttons: {
-      reset: "リセット",
-      submit: "送信",
+      reset: "この項目の上書きを削除",
+      submit: "確認",
     },
     notifications: {
-      reset: "{path} の添付ファイル設定をリセットしました",
-      overridden: "{path} の添付ファイル設定を上書きしました",
-    },
-  },
-
-  extensionOverride: {
-    title: "拡張子ごとの上書き設定",
-    rootPath: {
-      name: "添付ファイルの保存先ルートパス",
-      desc: "この拡張子の添付ファイルのルートパスを選択",
-    },
-    rootFolder: {
-      name: "ルートフォルダ",
-      desc: "この拡張子のルートフォルダ",
-    },
-    attachmentPath: {
-      name: "添付ファイルのパス",
-      desc: "この拡張子のルートフォルダ内の添付ファイルのパス",
-    },
-    attachmentFormat: {
-      name: "添付ファイルのフォーマット",
-      desc: "この拡張子の添付ファイルの名前の付け方を定義します",
-    },
-    buttons: {
-      save: "保存",
+      reset: "{path} の上書きを削除しました",
+      overridden: "{path} のグローバル添付ファイル設定を上書きしました",
     },
   },
 
@@ -119,11 +117,11 @@ export const ja = {
 
   notices: {
     fileExcluded: "{path} は除外されました",
-    overrideRemoved: "{path} の上書き設定を削除しました",
+    overrideRemoved: "{path} の上書きを削除しました",
     fileRenamed: "{from} から {to} にリネームしました",
     filesRenamedBatch: "{count} 件の添付ファイルをリネームしました",
     arrangeCompleted: "整理が完了しました",
-    resetAttachmentSetting: "{path} の添付ファイル設定をリセットしました",
+    resetAttachmentSetting: "{path} の上書きを削除しました",
     error: {
       unknownError: "不明なエラーが発生しました",
     },
@@ -132,21 +130,22 @@ export const ja = {
   commands: {
     rearrangeAllLinks: "リンクされているすべての添付ファイルを再整理",
     rearrangeActiveLinks: "リンクされている添付ファイルを再整理",
-    resetOverrideSetting: "上書き設定をリセット",
+    overrideSetting: "グローバル添付ファイル設定を上書き",
+    resetOverrideSetting: "この項目の上書きを削除：{path}",
     clearUnusedStorage: "未使用の元のファイル名ストレージをクリア",
   },
 
   errors: {
-    canvasNotSupported: "Canvas は拡張子ごとの上書き設定としてサポートされていません。",
-    markdownNotSupported: "Markdown は拡張子ごとの上書き設定としてサポートされていません。",
-    extensionEmpty: "拡張子ごとの上書き設定は空にできません。",
-    duplicateExtension: "重複した拡張子ごとの上書き設定。",
-    excludedExtension: "拡張子ごとの上書き設定は、除外された拡張子にできません。",
-    attachFormatEmpty: "添付ファイルのフォーマットを空にできません。",
-    attachFormatIllegalChar: "添付ファイルのフォーマットに不正なファイル名文字が含まれています：{char}",
-    attachFormatUnknownVariable: "添付ファイルのフォーマット内の未知の変数：{name}",
-    attachmentPathEmpty: "添付ファイルのパスを空にできません。",
-    attachmentPathIllegalChar: "添付ファイルのパスに不正なファイル名文字が含まれています：{char}",
-    attachmentPathUnknownVariable: "添付ファイルのパス内の未知の変数：{name}",
+    canvasNotSupported: "Canvas は拡張子例外としてサポートされていません。",
+    markdownNotSupported: "Markdown は拡張子例外としてサポートされていません。",
+    extensionEmpty: "拡張子例外は空にできません。",
+    duplicateExtension: "重複した拡張子例外。",
+    excludedExtension: "拡張子例外は、除外された拡張子にできません。",
+    attachFormatEmpty: "添付ファイル名を空にできません。",
+    attachFormatIllegalChar: "添付ファイル名に不正なファイル名文字が含まれています：{char}",
+    attachFormatUnknownVariable: "添付ファイル名内の未知の変数：{name}",
+    attachmentPathEmpty: "添付ファイルのフォルダを空にできません。",
+    attachmentPathIllegalChar: "添付ファイルのフォルダに不正なファイル名文字が含まれています：{char}",
+    attachmentPathUnknownVariable: "添付ファイルのフォルダ内の未知の変数：{name}",
   },
 } as const satisfies LocaleShape<typeof en>;

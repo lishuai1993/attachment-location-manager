@@ -1,8 +1,24 @@
-export const DEBUG = !(process.env.BUILD_ENV === "production");
-if (DEBUG) console.log("DEBUG is enabled");
+import { LogLevel, log } from "./logger";
 
-export function debugLog(...args: unknown[]) {
-  if (DEBUG) {
-    console.log(new Date().toISOString().slice(11, 23), ...args);
-  }
+/**
+ * Legacy dev-only logger, kept as a thin alias while call sites migrate to the
+ * leveled API in `logger.ts`. Emits at TRACE level under the `sys:legacy` tag.
+ */
+export function debugLog(...args: unknown[]): void {
+  log(LogLevel.TRACE, "sys:legacy", formatLegacyArgs(args));
+}
+
+function formatLegacyArgs(args: unknown[]): string {
+  return args
+    .map((arg) => {
+      if (typeof arg === "string") {
+        return arg;
+      }
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    })
+    .join(" ");
 }

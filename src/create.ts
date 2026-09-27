@@ -2,13 +2,15 @@ import { App, Plugin, Notice, TFile, TFolder, debounce, normalizePath, MarkdownV
 import { deduplicateNewName } from "./lib/deduplicate";
 import { path } from "./lib/path";
 import { debugLog } from "./lib/log";
+import { error, info, trace, warn, warnOnce } from "./lib/logger";
 import { AttachmentManagementPluginSettings } from "./settings/settings";
 import { getOverrideSetting } from "./override";
 import { getMetadata } from "./settings/metadata";
 import { isExcluded } from "./exclude";
-import { getExtensionOverrideSetting } from "./model/extensionOverride";
+import { getExtensionOverrideSetting } from "./lib/extension";
 import { isImage, isPastedImage, md5sum } from "./utils";
 import { saveOriginalName } from "./lib/originalStorage";
+import { planLinkRewrite } from "./lib/embed";
 import { t } from "./i18n/index";
 
 // Batch rename notices so rapid renames (e.g. paste bursts, rearrange-driven
@@ -56,20 +58,50 @@ export class CreateHandler {
    * @returns - none
    */
   processAttach(attach: TFile, source: TFile) {
+    info("pipe:paste", "processAttach start", {
+      note: source.path,
+      attach: attach.path,
+      extension: attach.extension,
+    });
+
     // ignore if the path of notes file has been excluded.
     if (source.parent && isExcluded(source.parent.path, this.settings)) {
       debugLog("processAttach - not a file or exclude path:", source.path);
+      warn("pipe:paste", "skip: note path excluded", {
+        note: source.path,
+        attach: attach.path,
+        reason: "excluded_path",
+      });
       // new Notice(`${source.path} was excluded from attachment management.`);
       return;
     }
 
     // get override setting for the notes file or extension
-    const { setting } = getOverrideSetting(this.settings, source);
+    const { setting, settingPath } = getOverrideSetting(this.settings, source);
     const { extSetting } = getExtensionOverrideSetting(attach.extension, setting);
+
+    info("pipe:paste", "effective setting resolved", {
+      note: source.path,
+      attach: attach.path,
+      settingPath: settingPath === "" ? "GLOBAL" : settingPath,
+      settingType: setting.type,
+      saveAttE: setting.saveAttE,
+      attachmentRoot: setting.attachmentRoot,
+      attachmentPath: setting.attachmentPath,
+      attachFormat: setting.attachFormat,
+      hasExtensionOverride: extSetting !== undefined,
+    });
 
     debugLog("processAttach - file.extension:", attach.extension);
     if (extSetting === undefined && !isImage(attach.extension) && !isPastedImage(attach)) {
       debugLog("renameFiles - no handle extension:", attach.extension);
+      // Routine for any user who pastes non-image files: WARN once, then count.
+      warnOnce("pipe:paste:extension_filtered", "pipe:paste", "skip: extension not handled", {
+        note: source.path,
+        attach: attach.path,
+        extension: attach.extension,
+        reason: "extension_filtered",
+      });
       return;
     }
 
@@ -77,26 +109,71 @@ export class CreateHandler {
     debugLog("processAttach - metadata:", metadata);
 
     const attachPath = metadata.getAttachmentPath(setting);
-    metadata.getAttachFileName(setting, this.settings.dateFormat, attach, this.app.vault.adapter).then((attachName) => {
-      attachName = attachName + "." + attach.extension;
-      // make sure the attachment path was created
-      this.app.vault.adapter
-        .exists(attachPath, true)
-        .then(async (exists) => {
-          if (!exists) {
-            await this.app.vault.adapter.mkdir(attachPath);
-            debugLog("processAttach - create path:", attachPath);
-          }
-        })
-        .finally(() => {
-          const attachPathFolder = this.app.vault.getAbstractFileByPath(attachPath) as TFolder;
-          // deduplicate the new name if needed
-          deduplicateNewName(attachName, attachPathFolder).then(({ name }) => {
-            debugLog("processAttach - new path of file:", path.join(attachPath, name));
-            this.renameCreateFile(attach, attachPath, name, source);
+    info("pipe:paste", "target computed", { note: source.path, attach: attach.path, attachPath: attachPath });
+    metadata
+      .getAttachFileName(setting, this.settings.dateFormat, attach, this.app.vault.adapter)
+      .then((attachName) => {
+        attachName = attachName + "." + attach.extension;
+        info("pipe:paste", "target name computed", { note: source.path, attach: attach.path, attachName: attachName });
+        // make sure the attachment path was created
+        this.app.vault.adapter
+          .exists(attachPath, true)
+          .then(async (exists) => {
+            if (!exists) {
+              await this.app.vault.adapter.mkdir(attachPath);
+              debugLog("processAttach - create path:", attachPath);
+              info("res:path", "attachment folder created", { path: attachPath });
+            } else {
+              trace("res:path", "attachment folder exists", { path: attachPath });
+            }
+          })
+          .finally(() => {
+            const attachPathFolder = this.app.vault.getAbstractFileByPath(attachPath) as TFolder;
+            if (attachPathFolder === null || !(attachPathFolder instanceof TFolder)) {
+              error("res:path", "target folder missing after mkdir", {
+                note: source.path,
+                attach: attach.path,
+                attachPath: attachPath,
+              });
+              return;
+            }
+            // deduplicate the new name if needed
+            deduplicateNewName(attachName, attachPathFolder)
+              .then(({ name }) => {
+                debugLog("processAttach - new path of file:", path.join(attachPath, name));
+                if (name !== attachName) {
+                  trace("pipe:paste", "name deduplicated", {
+                    attach: attach.path,
+                    requested: attachName,
+                    resolved: name,
+                  });
+                }
+                this.renameCreateFile(attach, attachPath, name, source);
+              })
+              .catch((err) => {
+                error("pipe:paste", "deduplicateNewName failed", {
+                  note: source.path,
+                  attach: attach.path,
+                  attachPath: attachPath,
+                  err: err,
+                });
+              });
+          })
+          .catch((err) => {
+            error("res:path", "failed to create attachment folder", {
+              note: source.path,
+              attachPath: attachPath,
+              err: err,
+            });
           });
+      })
+      .catch((err) => {
+        error("pipe:paste", "getAttachFileName failed", {
+          note: source.path,
+          attach: attach.path,
+          err: err,
         });
-    });
+      });
   }
 
   /**
@@ -124,6 +201,11 @@ export class CreateHandler {
     this.app.vault
       .rename(attach, dst)
       .then(() => {
+        info("pipe:paste", "attachment renamed", {
+          note: source.path,
+          path: dst,
+          nameChanged: name !== attachName,
+        });
         if (name !== attachName) {
           queueRenameNotice(name, attachName);
         }
@@ -135,15 +217,34 @@ export class CreateHandler {
         // Manually update the link in the source file
         this.updateLinkInSource(source, oldLink, newLink);
       })
+      .catch((err) => {
+        error("pipe:paste", "rename failed", { note: source.path, attach: attach.path, dst: dst, err: err });
+      })
       .finally(() => {
         const { setting } = getOverrideSetting(this.settings, source);
-        md5sum(this.app.vault.adapter, attach).then((md5) => {
-          saveOriginalName(this.settings, setting, attach.extension, {
-            n: originalBasename,
-            md5: md5,
+        md5sum(this.app.vault.adapter, attach)
+          .then((md5) => {
+            saveOriginalName(this.settings, setting, attach.extension, {
+              n: originalBasename,
+              md5: md5,
+            });
+            trace("pipe:paste", "original name persisted", {
+              attach: dst,
+              originalBasename: originalBasename,
+              md5: md5,
+            });
+            return this.plugin.saveData(this.settings);
+          })
+          .catch((err) => {
+            // Without this the ${originalname} mapping is lost and the file keeps its
+            // renamed basename forever, with nothing to show why.
+            error("pipe:paste", "original name persistence failed", {
+              note: source.path,
+              attach: dst,
+              originalBasename: originalBasename,
+              err: err,
+            });
           });
-          this.plugin.saveData(this.settings);
-        });
       });
   }
 
@@ -157,6 +258,7 @@ export class CreateHandler {
    */
   private updateLinkInSource(source: TFile, oldLink: string, newLink: string) {
     if (oldLink === newLink) {
+      trace("pipe:paste", "link unchanged, nothing to update", { note: source.path, link: oldLink });
       return;
     }
 
@@ -165,29 +267,56 @@ export class CreateHandler {
     if (mdView && mdView.file && mdView.file.path === source.path && mdView.editor) {
       const editor = mdView.editor;
       const content = editor.getValue();
-      const linkIndex = content.indexOf(oldLink);
-      if (linkIndex !== -1) {
-        // Calculate line/ch positions for replaceRange
-        const before = content.substring(0, linkIndex);
+      const plan = planLinkRewrite(content, oldLink, newLink);
+      if (plan !== null) {
+        // Calculate line/ch positions for replaceRange using absolute offsets
+        const before = content.substring(0, plan.from);
         const lines = before.split("\n");
         const fromLine = lines.length - 1;
         const fromCh = lines[fromLine].length;
 
-        const oldLinkLines = oldLink.split("\n");
-        const toLine = fromLine + oldLinkLines.length - 1;
-        const toCh = oldLinkLines.length > 1 ? oldLinkLines[oldLinkLines.length - 1].length : fromCh + oldLink.length;
+        const toBefore = content.substring(0, plan.to);
+        const toLines = toBefore.split("\n");
+        const toLine = toLines.length - 1;
+        const toCh = toLines[toLine].length;
 
         // replaceRange preserves cursor position and does not trigger a file reload
-        editor.replaceRange(newLink, { line: fromLine, ch: fromCh }, { line: toLine, ch: toCh });
-        debugLog("updateLinkInSource - updated via editor API");
+        editor.replaceRange(plan.text, { line: fromLine, ch: fromCh }, { line: toLine, ch: toCh });
+        trace("pipe:paste", "link updated via editor API", {
+          note: source.path,
+          from: oldLink,
+          to: newLink,
+          annotationPreserved: plan.annotationPreserved,
+        });
         return;
       }
     }
 
     // Fallback for canvas or non-active files: update via adapter.process
-    debugLog("updateLinkInSource - falling back to adapter.process");
-    this.app.vault.adapter.process(source.path, (data) => {
-      return data.replace(oldLink, newLink);
-    });
+    this.app.vault.adapter
+      .process(source.path, (data) => {
+        // Recompute against the on-disk content: offsets from the editor are stale here.
+        const plan = planLinkRewrite(data, oldLink, newLink);
+        if (plan === null) {
+          return data;
+        }
+        trace("pipe:paste", "link updated via adapter.process", {
+          note: source.path,
+          from: oldLink,
+          to: newLink,
+          annotationPreserved: plan.annotationPreserved,
+        });
+        return data.substring(0, plan.from) + plan.text + data.substring(plan.to);
+      })
+      .catch((err) => {
+        // The attachment moved but the link still points at the old path, i.e. the note
+        // is now broken. Nothing else reports this.
+        error("pipe:paste", "link update via adapter.process failed", {
+          note: source.path,
+          from: oldLink,
+          to: newLink,
+          err: err,
+        });
+      });
   }
 }

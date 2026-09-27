@@ -11,7 +11,7 @@ import {
 import { getRootPath } from "../commons";
 import { path } from "../lib/path";
 import { md5sum } from "../utils";
-import { getExtensionOverrideSetting } from "../model/extensionOverride";
+import { getExtensionOverrideSetting, resolveExtensionFields } from "../lib/extension";
 import { loadOriginalName } from "../lib/originalStorage";
 import { debugLog } from "../lib/log";
 
@@ -85,7 +85,7 @@ class Metadata {
       md5 = await md5sum(adapter, this.attachmentFile);
       const { extSetting } = getExtensionOverrideSetting(this.attachmentFile.extension, setting);
       if (extSetting !== undefined) {
-        attachFormat = extSetting.attachFormat;
+        attachFormat = resolveExtensionFields(setting, extSetting).attachFormat;
       } else {
         attachFormat = setting.attachFormat;
       }
@@ -119,13 +119,14 @@ class Metadata {
     let attachPath = "";
 
     if (this.attachmentFile !== undefined) {
-      // using extension override setting first
+      // an exception entry only contributes the fields it explicitly carries
       const { extSetting } = getExtensionOverrideSetting(this.attachmentFile.extension, setting);
       if (extSetting !== undefined) {
-        root = getRootPath(this.parentPath, extSetting);
+        const fields = resolveExtensionFields(setting, extSetting);
+        root = getRootPath(this.parentPath, fields);
         attachPath = path.join(
           root,
-          extSetting.attachmentPath
+          fields.attachmentPath
             .replace(`${SETTINGS_VARIABLES_NOTEPATH}`, this.parentPath)
             .replace(`${SETTINGS_VARIABLES_NOTENAME}`, this.basename)
             .replace(`${SETTINGS_VARIABLES_NOTEPARENT}`, this.parentName),
