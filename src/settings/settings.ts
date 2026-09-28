@@ -337,6 +337,7 @@ export class AttachmentManagementSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setClass("attach_management_setting_indent")
       .setName(t("settings.excludeSubpaths.name"))
       .setDesc(t("settings.excludeSubpaths.desc"))
       .addToggle((toggle) =>

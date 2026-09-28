@@ -130,12 +130,12 @@ This feature allows you to specify the setting for a serials extension. You can 
 
 ![SCR-20230918-pihr](images/SCR-20230918-pihr.png)
 
-### Exclude Paths
+### Unmanaged note folders
 
 If you want some paths to be skipped by this plugin, add them to the text area.
 If you have multiple paths, split them with a semicolon ';'.
 
-By default, the "Exclude paths" will only work on the folder you added, and that folder contains at least one markdown file; you can toggle "Exclude subpaths" to exclude subpaths also.
+By default, the "Unmanaged note folders" will only work on the folder you added, and that folder contains at least one markdown file; you can toggle "Include subfolders" to cover subfolders also.
 
 > **The path is case-sensitive and should not have a leading slash '/' at the beginning.**
 

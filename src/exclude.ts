@@ -8,13 +8,13 @@ export function isExcluded(path: string, settings: AttachmentManagementPluginSet
     if (excludedPath.length === 0) {
       continue;
     }
-    if (settings.excludeSubpaths && path.startsWith(excludedPath)) {
+    // Trailing slashes are stripped so that "Notes/" still means the folder "Notes".
+    const base = excludedPath.replace(/\/+$/, "");
+    // Sub-path match requires a path-segment boundary, so "Notes" does not also
+    // swallow its siblings such as "Notes-old".
+    if (path === base || (settings.excludeSubpaths && path.startsWith(base + "/"))) {
       debugLog("isExcluded: ", path);
       return true;
-    } else {
-      if (path === excludedPath) {
-        return true;
-      }
     }
   }
 

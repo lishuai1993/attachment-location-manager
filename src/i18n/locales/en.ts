@@ -74,17 +74,17 @@ export const en = {
       desc: "Automatically rename the attachment folder/filename when you rename the folder/filename where the corresponding md/canvas file be placed.",
     },
     excludeExtension: {
-      name: "Exclude extension pattern",
-      desc: "Regex pattern to exclude certain extensions from being handled.",
+      name: "Excluded from attachments",
+      desc: "Extensions listed here are not treated as attachments, matched as a regular expression against the extension without the leading dot.",
       placeholder: "pdf|docx?|xlsx?|pptx?|zip|rar",
     },
     excludedPaths: {
-      name: "Excluded paths",
-      desc: "Provide the full path of the folder names (case sensitive and without leading slash '/') divided by semicolon (;) to be excluded from renaming.",
+      name: "Unmanaged note folders",
+      desc: "Notes in these folders are left unmanaged. Provide the full path list (case sensitive, no leading slash '/'), separated by semicolons (;).",
     },
     excludeSubpaths: {
-      name: "Exclude subpaths",
-      desc: "Turn on this option if you want to also exclude all subfolders of the folder paths provided above.",
+      name: "Include subfolders",
+      desc: "Applies to subfolders of the folders above as well.",
     },
     diagnostics: {
       name: "Diagnostics",

@@ -50,6 +50,12 @@ available in the app when your plugin is enabled.
   gap: 0.5em;
 }
 
+/* 设置项的子项：缩进到图层例外卡片内层设置项的同一条左基准线（如「子目录同此」从属于「不管理的笔记目录」）。
+   基准线 = 卡片外边距（.attach_management_exception_card 的 margin-left）+ 卡片内边距（同一条规则的 padding）。 */
+.attach_management_setting_indent {
+  margin-left: calc(var(--size-4-4, 1em) + var(--size-4-2, 0.5em));
+}
+
 /* 顺序图例：当前编辑的那一级直接在链上高亮，不另起一行自述 */
 .attach_management_legend {
   margin: 0.25em 0 1em;
