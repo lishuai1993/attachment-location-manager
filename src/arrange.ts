@@ -3,7 +3,7 @@ import { path } from "./lib/path";
 import { debugLog } from "./lib/log";
 import { error, info, trace, warn, warnOnce } from "./lib/logger";
 import { getOverrideSetting } from "./override";
-import { isAttachment } from "./utils";
+import { isAttachment, isNonNoteFile } from "./utils";
 import { AttachmentManagementPluginSettings, AttachmentPathSettings } from "./settings/settings";
 import { SETTINGS_VARIABLES_DATES, SETTINGS_VARIABLES_NOTENAME } from "./lib/constant";
 import { deduplicateNewName } from "./lib/deduplicate";
@@ -74,9 +74,9 @@ export class ArrangeHandler {
 
     for (const obNote of Object.keys(attachments)) {
       const innerFile = this.app.vault.getAbstractFileByPath(obNote);
-      if (!(innerFile instanceof TFile) || isAttachment(this.app, this.pluginSettings, innerFile)) {
-        debugLog(`rearrangeAttachment - ${obNote} not exists or is attachment, skipped`);
-        trace("cmd:arrange", "skip note", { note: obNote, reason: "note_missing_or_attachment" });
+      if (!(innerFile instanceof TFile) || isNonNoteFile(innerFile)) {
+        debugLog(`rearrangeAttachment - ${obNote} not exists or is not a note, skipped`);
+        trace("cmd:arrange", "skip note", { note: obNote, reason: "note_missing_or_not_a_note" });
         skipped += 1;
         continue;
       }
@@ -280,10 +280,7 @@ export class ArrangeHandler {
     } else if (type == RearrangeType.ACTIVE) {
       const file = getActiveFile(this.app);
       if (file) {
-        if (
-          (file.parent && isExcluded(file.parent.path, this.pluginSettings)) ||
-          isAttachment(this.app, this.pluginSettings, file)
-        ) {
+        if ((file.parent && isExcluded(file.parent.path, this.pluginSettings)) || isNonNoteFile(file)) {
           allFiles = [];
           source = "active_note_skipped";
           // new Notice(`${file.path} was excluded, skipped`);

@@ -20,23 +20,23 @@ export const en = {
   },
 
   exception: {
-    addGlobal: "Add a global extension exception",
-    addFile: "Add an extension exception for this file",
-    addFolder: "Add an extension exception for this folder",
+    addGlobal: "Add a global special case",
+    addFile: "Add a special case for this file",
+    addFolder: "Add a special case for this folder",
     section: {
-      title: "Exceptions: these extensions do not use the values above",
-      desc: "An exception only rewrites the fields you customize; the rest follow this layer.",
+      title: "Special cases: these extensions take their own values instead of the ones above",
+      desc: "A special case waives nothing; it only rewrites the fields you customize, and the rest follow this layer.",
     },
     extension: {
       name: "Extension",
-      desc: "Regular expression matching the attachment extension. The first match in the list wins.",
+      desc: "Regular expression matching the attachment extension, case-insensitively. The first match in the list wins.",
       placeholder: "pdf|docx?",
     },
     inherit: "Inherit this layer",
     customize: "Customize",
     inheritValue: "Inherit: {value}",
     emptyValue: "(empty)",
-    remove: "Remove this exception",
+    remove: "Remove this special case",
     rootFolderDesc: "Only used when the root path is not “Copy Obsidian settings”.",
   },
 
@@ -75,7 +75,7 @@ export const en = {
     },
     excludeExtension: {
       name: "Excluded from attachments",
-      desc: "Extensions listed here are not treated as attachments, matched as a regular expression against the extension without the leading dot.",
+      desc: "Extensions listed here are not treated as attachments, matched as a regular expression against the extension without the leading dot and case-insensitively. Left empty, every non-note file is treated as an attachment.",
       placeholder: "pdf|docx?|xlsx?|pptx?|zip|rar",
     },
     excludedPaths: {
@@ -136,11 +136,12 @@ export const en = {
   },
 
   errors: {
-    canvasNotSupported: "Canvas is not supported as an extension exception.",
-    markdownNotSupported: "Markdown is not supported as an extension exception.",
-    extensionEmpty: "Extension exception cannot be empty.",
-    duplicateExtension: "Duplicate extension exception.",
-    excludedExtension: "Extension exception cannot be an excluded extension.",
+    canvasNotSupported: "Canvas cannot be used as a special case.",
+    markdownNotSupported: "Markdown cannot be used as a special case.",
+    extensionEmpty: "A special case needs an extension.",
+    duplicateExtension: "A special case with this extension already exists.",
+    excludedExtension: "This extension is excluded from attachments, so it cannot be a special case.",
+    exceptionRejected: "An extension on a special case card did not pass validation. Correct it or remove that card.",
     attachFormatEmpty: "Attachment name cannot be empty.",
     attachFormatIllegalChar: "Attachment name contains illegal filename character: {char}",
     attachFormatUnknownVariable: "Unknown variable in attachment name: {name}",

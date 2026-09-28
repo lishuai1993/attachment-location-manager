@@ -19,7 +19,7 @@ import {
   getRenameOverrideSetting,
   updateOverrideSetting,
 } from "./override";
-import { isAttachment, isMarkdownFile, isCanvasFile, matchExtension, md5sum } from "./utils";
+import { isNonNoteFile, isMarkdownFile, isCanvasFile, matchExtension, md5sum } from "./utils";
 import { ArrangeHandler, RearrangeType } from "./arrange";
 import { CreateHandler } from "./create";
 import { isExcluded } from "./exclude";
@@ -96,10 +96,7 @@ export default class AttachmentManagementPlugin extends Plugin {
 
       this.registerEvent(
         this.app.workspace.on("file-menu", async (menu, file) => {
-          if (
-            (file.parent && isExcluded(file.parent.path, this.settings)) ||
-            isAttachment(this.app, this.settings, file)
-          ) {
+          if ((file.parent && isExcluded(file.parent.path, this.settings)) || isNonNoteFile(file)) {
             return;
           }
           menu.addItem((item) => {
@@ -232,9 +229,9 @@ export default class AttachmentManagementPlugin extends Plugin {
         this.app.vault.on("rename", async (file: TAbstractFile, oldPath: string) => {
           trace("evt:rename", "rename event", { newPath: file.path, oldPath: oldPath });
 
-          // ignore attachment
-          if (isAttachment(this.app, this.settings, file)) {
-            trace("evt:rename", "skip: attachment", { path: file.path, reason: "attachment" });
+          // ignore anything that is not a note
+          if (isNonNoteFile(file)) {
+            trace("evt:rename", "skip: not a note", { path: file.path, reason: "not_a_note" });
             return;
           }
 
@@ -323,13 +320,10 @@ export default class AttachmentManagementPlugin extends Plugin {
         this.app.vault.on("delete", async (file: TAbstractFile) => {
           trace("evt:delete", "delete event", { path: file.path });
 
-          if (
-            (file.parent && isExcluded(file.parent.path, this.settings)) ||
-            isAttachment(this.app, this.settings, file)
-          ) {
-            trace("evt:delete", "skip: excluded path or attachment", {
+          if ((file.parent && isExcluded(file.parent.path, this.settings)) || isNonNoteFile(file)) {
+            trace("evt:delete", "skip: excluded path or not a note", {
               path: file.path,
-              reason: "excluded_or_attachment",
+              reason: "excluded_or_not_a_note",
             });
             return;
           }
@@ -578,7 +572,7 @@ export default class AttachmentManagementPlugin extends Plugin {
         const file = getActiveFile(this.app);
 
         if (file) {
-          if (isAttachment(this.app, this.settings, file)) {
+          if (isNonNoteFile(file)) {
             return true;
           }
 
@@ -612,7 +606,7 @@ export default class AttachmentManagementPlugin extends Plugin {
       checkCallback: (checking: boolean) => {
         const file = getActiveFile(this.app);
         if (file) {
-          if (isAttachment(this.app, this.settings, file)) {
+          if (isNonNoteFile(file)) {
             return true;
           }
 

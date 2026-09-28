@@ -28,6 +28,15 @@ export interface ExceptionAreaOptions {
   persist: () => Promise<void>;
 }
 
+export interface ExceptionAreaHandle {
+  /**
+   * True while a card is showing an extension that failed validation and was therefore kept
+   * out of the layer. A caller with a submit button must check this: the rejected text never
+   * reaches the model, so only the area itself knows the user still has unfinished input.
+   */
+  hasRejectedInput: () => boolean;
+}
+
 type FieldValidator = (value: string) => string | null;
 
 /** Visual container that binds a layer's four fields to the exceptions it owns. */
@@ -68,9 +77,30 @@ export function renderOrderLegend(parent: HTMLElement, active: ExceptionScope): 
  * add button. Entries are edited in place, so the area rebuilds itself on structural
  * changes and never opens a modal.
  */
-export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaOptions): void {
+export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaOptions): ExceptionAreaHandle {
   const { plugin, layer, scope } = opts;
   const area = container.createDiv({ cls: "attach_management_exception_area" });
+
+  // A just-added card has no extension yet, and an empty extension is invalid. Holding it
+  // outside the layer until a valid extension is typed keeps the blank placeholder out of
+  // `data.json` entirely; the add button used to persist `{extension: ""}` immediately.
+  let draft: ExtensionOverrideSettings | undefined;
+
+  /** The layer's own entries plus the not-yet-committed draft, so validation sees both. */
+  const visibleEntries = (): ExtensionOverrideSettings[] => {
+    const own = layer.extensionOverride ?? [];
+    return draft === undefined ? own : [...own, draft];
+  };
+
+  const hitFor = (index: number) =>
+    validateExtensionEntry({ ...layer, extensionOverride: visibleEntries() }, plugin.settings).find(
+      (wrong) => (wrong.index < 0 ? 0 : wrong.index) === index,
+    );
+
+  // Keyed by entry object rather than index: the objects survive a rebuild, and an entry that
+  // has been deleted simply stops appearing in `visibleEntries()`, so nothing needs syncing.
+  const rejected = new Set<ExtensionOverrideSettings>();
+  const hasRejectedInput = (): boolean => visibleEntries().some((ext) => rejected.has(ext));
 
   const addLabel = (): string => {
     switch (scope) {
@@ -178,9 +208,7 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
       .setDesc(t("exception.section.desc"))
       .setClass("attach_management_exception_head");
 
-    const entries: ExtensionOverrideSettings[] = layer.extensionOverride ?? [];
-
-    entries.forEach((ext, index) => {
+    visibleEntries().forEach((ext, index) => {
       const card = area.createDiv({ cls: "attach_management_exception_card" });
 
       new Setting(card)
@@ -192,23 +220,46 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
             .setPlaceholder(t("exception.extension.placeholder"))
             .setValue(ext.extension)
             .onChange(async (value) => {
+              const previous = ext.extension;
               ext.extension = value;
-              const hit = validateExtensionEntry(layer, plugin.settings).find(
-                (wrong) => (wrong.index < 0 ? 0 : wrong.index) === index,
-              );
+              const hit = hitFor(index);
               markInvalid(text.inputEl, hit !== undefined);
-              if (hit === undefined) {
-                await opts.persist();
-              } else {
+              if (hit !== undefined) {
+                // Leave the rejected text on screen so typing can continue, but keep it out
+                // of the model: otherwise a later save triggered by an unrelated field
+                // would persist it along with that valid change.
+                ext.extension = previous;
+                rejected.add(ext);
                 generateErrorExtensionMessage(hit.type);
+                return;
               }
+              rejected.delete(ext);
+              // The first valid extension is what commits a draft card into the layer.
+              if (draft === ext) {
+                if (layer.extensionOverride === undefined) {
+                  layer.extensionOverride = [];
+                }
+                layer.extensionOverride.push(ext);
+                draft = undefined;
+              }
+              await opts.persist();
             });
+          // An entry already in the layer can be invalid on load — stale data, or a pattern
+          // narrowed after it was written. Show that, but without a notice on every render.
+          if (draft !== ext) {
+            markInvalid(text.inputEl, hitFor(index) !== undefined);
+          }
         })
         .addExtraButton((button) =>
           button
             .setIcon("trash")
             .setTooltip(t("exception.remove"))
             .onClick(async () => {
+              if (draft === ext) {
+                draft = undefined;
+                build();
+                return;
+              }
               layer.extensionOverride?.splice(index, 1);
               build();
               await opts.persist();
@@ -285,15 +336,14 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
       });
     });
 
-    // The button sits after the cards, so a new entry appears above it.
+    // The button sits after the cards, so a new entry appears above it. It only ever opens
+    // an empty draft card; nothing is written until that card gets a valid extension.
     new Setting(area).addButton((button) => {
-      button.setButtonText(addLabel()).onClick(async () => {
-        if (layer.extensionOverride === undefined) {
-          layer.extensionOverride = [];
+      button.setButtonText(addLabel()).onClick(() => {
+        if (draft === undefined) {
+          draft = { extension: "" };
+          build();
         }
-        layer.extensionOverride.push({ extension: "" });
-        build();
-        await opts.persist();
         const inputs = area.getElementsByClassName(EXCEPTION_INPUT_CLASS);
         const added = inputs[inputs.length - 1] as HTMLInputElement | undefined;
         added?.focus();
@@ -302,4 +352,6 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
   };
 
   build();
+
+  return { hasRejectedInput };
 }

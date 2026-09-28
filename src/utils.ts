@@ -12,9 +12,6 @@ import {
 
 import { Md5 } from "ts-md5";
 
-const PASTED_IMAGE_PREFIX = "Pasted image ";
-const ImageExtensionRegex = /^(jpe?g|png|gif|svg|bmp|eps|webp)$/i;
-
 export const blobToArrayBuffer = (blob: Blob) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -31,21 +28,13 @@ export function isCanvasFile(extension: string): boolean {
   return extension === "canvas";
 }
 
-export function isPastedImage(file: TAbstractFile): boolean {
-  if (file instanceof TFile) {
-    if (file.name.startsWith(PASTED_IMAGE_PREFIX)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function isImage(extension: string): boolean {
-  const match = extension.match(ImageExtensionRegex);
-  if (match !== null) {
-    return true;
-  }
-  return false;
+/**
+ * Test whether the object is a file that is not a note. Folders and note files
+ * (markdown, canvas) are not, so this splits the vault into "note or folder" and
+ * "candidate attachment".
+ */
+export function isNonNoteFile(file: TAbstractFile | null): boolean {
+  return file instanceof TFile && !isMarkdownFile(file.extension) && !isCanvasFile(file.extension);
 }
 
 /**
@@ -91,18 +80,22 @@ export function stripPaths(src: string, dst: string): { stripedSrc: string; stri
 }
 
 /**
- * Test if the extension is matched by pattern
+ * Test if the extension is matched by pattern. Case-insensitive: Obsidian lowercases
+ * `TFile.extension`, but the pattern is typed by the user and may not be.
  * @param extension extension of a file
  * @param pattern patterns for match extension
  * @returns true if matched, false otherwise
  */
 export function matchExtension(extension: string, pattern: string): boolean {
   if (!pattern || pattern === "") return false;
-  return new RegExp(pattern).test(extension);
+  return new RegExp(pattern, "i").test(extension);
 }
 
 /**
- * Check whether the file is an attachment
+ * Check whether the file is managed as an attachment: any file that is not a note
+ * and whose extension is not excluded. This is the single definition of the
+ * attachment range; call sites that only need "not a note" should use
+ * {@link isNonNoteFile} instead, or an excluded file would be mistaken for a note.
  * @param settings plugins configuration
  * @param filePath file path
  * @returns true if the file is an attachment, false otherwise
@@ -112,18 +105,9 @@ export function isAttachment(
   settings: AttachmentManagementPluginSettings,
   filePath: string | TAbstractFile,
 ): boolean {
-  let file = null;
-  if (filePath instanceof TAbstractFile) {
-    file = filePath;
-  } else {
-    file = app.vault.getAbstractFileByPath(filePath);
-  }
+  const file = filePath instanceof TAbstractFile ? filePath : app.vault.getAbstractFileByPath(filePath);
 
-  if (file === null || !(file instanceof TFile)) {
-    return false;
-  }
-
-  if (isMarkdownFile(file.extension) || isCanvasFile(file.extension)) {
+  if (file === null || !(file instanceof TFile) || !isNonNoteFile(file)) {
     return false;
   }
 
@@ -165,29 +149,31 @@ export function validateExtensionEntry(setting: AttachmentPathSettings, plugin: 
     if (extOverride.some((ext) => ext.extension === "")) {
       wrongIndex.push({ type: "empty", index: extOverride.findIndex((ext) => ext.extension === "") });
     }
-    const duplicate = extOverride
-      .map((ext) => ext.extension)
-      .filter((value, index, self) => self.indexOf(value) !== index);
-    if (duplicate.length > 0) {
-      duplicate.forEach((dupli) => {
-        wrongIndex.push({ type: "duplicate", index: extOverride.findIndex((ext) => dupli === ext.extension) });
-      });
+    // These three compare case-insensitively too: patterns are matched with the `i` flag,
+    // so `PDF` and `pdf` are the same extension to the runtime, and the second of the pair
+    // is a dead entry that must not pass silently.
+    const lowered = extOverride.map((ext) => ext.extension.toLowerCase());
+    lowered.forEach((value, index) => {
+      // First match wins, so the earliest entry carrying an extension is the live one and
+      // every later one is dead. Flag the dead ones: flagging the first instead would let a
+      // just-typed duplicate pass and reach `data.json`.
+      if (lowered.indexOf(value) !== index) {
+        wrongIndex.push({ type: "duplicate", index });
+      }
+    });
+    const mdIndex = lowered.indexOf("md");
+    if (mdIndex >= 0) {
+      wrongIndex.push({ type: "md", index: mdIndex });
     }
-    const markdown = extOverride.filter((ext) => ext.extension === "md");
-    if (markdown.length > 0) {
-      wrongIndex.push({ type: "md", index: extOverride.findIndex((ext) => ext.extension === "md") });
+    const canvasIndex = lowered.indexOf("canvas");
+    if (canvasIndex >= 0) {
+      wrongIndex.push({ type: "canvas", index: canvasIndex });
     }
-    const canvas = extOverride.filter((ext) => ext.extension === "canvas");
-    if (canvas.length > 0) {
-      wrongIndex.push({ type: "canvas", index: extOverride.findIndex((ext) => ext.extension === "canvas") });
-    }
-    const excludedFromSettings = plugin.excludeExtensionPattern.split("|");
-    const excluded = extOverride.filter((ext) => excludedFromSettings.includes(ext.extension));
-    if (excluded.length > 0) {
-      wrongIndex.push({
-        type: "excluded",
-        index: extOverride.findIndex((ext) => excludedFromSettings.includes(ext.extension)),
-      });
+    // Same engine as the runtime gate. A literal comparison against split("|") would
+    // let a pattern like `docx?` slip a never-firing exception past validation.
+    const excludedIndex = extOverride.findIndex((ext) => matchExtension(ext.extension, plugin.excludeExtensionPattern));
+    if (excludedIndex >= 0) {
+      wrongIndex.push({ type: "excluded", index: excludedIndex });
     }
   }
   return wrongIndex;

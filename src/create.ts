@@ -2,13 +2,13 @@ import { App, Plugin, Notice, TFile, TFolder, debounce, normalizePath, MarkdownV
 import { deduplicateNewName } from "./lib/deduplicate";
 import { path } from "./lib/path";
 import { debugLog } from "./lib/log";
-import { error, info, trace, warn, warnOnce } from "./lib/logger";
+import { error, info, trace, warn } from "./lib/logger";
 import { AttachmentManagementPluginSettings } from "./settings/settings";
 import { getOverrideSetting } from "./override";
 import { getMetadata } from "./settings/metadata";
 import { isExcluded } from "./exclude";
 import { getExtensionOverrideSetting } from "./lib/extension";
-import { isImage, isPastedImage, md5sum } from "./utils";
+import { md5sum } from "./utils";
 import { saveOriginalName } from "./lib/originalStorage";
 import { planLinkRewrite } from "./lib/embed";
 import { t } from "./i18n/index";
@@ -92,18 +92,8 @@ export class CreateHandler {
       hasExtensionOverride: extSetting !== undefined,
     });
 
-    debugLog("processAttach - file.extension:", attach.extension);
-    if (extSetting === undefined && !isImage(attach.extension) && !isPastedImage(attach)) {
-      debugLog("renameFiles - no handle extension:", attach.extension);
-      // Routine for any user who pastes non-image files: WARN once, then count.
-      warnOnce("pipe:paste:extension_filtered", "pipe:paste", "skip: extension not handled", {
-        note: source.path,
-        attach: attach.path,
-        extension: attach.extension,
-        reason: "extension_filtered",
-      });
-      return;
-    }
+    // No extension gate here: the attachment range is decided once, when the file
+    // enters the queue (see the `create` handler), and this pipeline must match it.
 
     const metadata = getMetadata(source.path, attach);
     debugLog("processAttach - metadata:", metadata);

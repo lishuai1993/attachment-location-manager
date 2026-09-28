@@ -17,7 +17,7 @@ This plugin supports more flexibly setting your attachment location with variabl
 
 Install and enable the plugin, after configuration you can paste or drop attachment file as usually and it will be auto renamed.
 
-This plugin supports a command `Rearrange linked attachments/Rearrange all linked attachments`. If you run this command, it will rename all attachments (image file default, to rename another type, you need to enable [Handle All Attachements](#handle-all-attachments)) that have been linked in the `markdown` or `canvas` file as you configured.
+This plugin supports a command `Rearrange linked attachments/Rearrange all linked attachments`. If you run this command, it will rename every attachment linked in the `markdown` or `canvas` file as you configured. An attachment is any file that is not a note (`md`/`canvas` excepted) and whose extension is not listed under **Excluded from attachments**; this is the same range the paste/drop pipeline handles.
 
 ![SCR-20230511-rrtk](./images/SCR-20230511-rrtk.png)
 
@@ -116,7 +116,7 @@ Use [Moment format options](https://momentjscom.readthedocs.io/en/latest/moment/
 
 #### Exclude Extension Pattern
 
-This option is useful if you want to ignore some file types. Write a Regex pattern to exclude certain extensions from being handled.
+This option is useful if you want to ignore some file types. Write a Regex pattern to exclude certain extensions from being handled. The pattern is matched against the extension without the leading dot, case-insensitively.
 
 ![SCR-20230918-pkys](./images/SCR-20230918-pkys.png)
 
@@ -126,7 +126,7 @@ Automatically rename the attachment folder/filename when you rename the folder/f
 
 ### Extension Override Setting
 
-This feature allows you to specify the setting for a serials extension. You can use a regex pattern here to override the global setting.
+This feature allows you to specify the setting for a serials extension. You can use a regex pattern here to override the global setting. The pattern is matched case-insensitively, and the first match in the list wins.
 
 ![SCR-20230918-pihr](images/SCR-20230918-pihr.png)
 
@@ -159,7 +159,7 @@ A1: It will exclude the whole vault folder.
 
 Q2: Is this plugin support auto rename pdf file?
 
-A2: By default, this plugin will only rename the image file. For other file types, you can use the extension override setting.
+A2: Yes. Every non-note file (`md`/`canvas` excepted) is handled, whatever its type. To leave a type alone, add its extension to **Excluded from attachments**; to give a type its own path or name, add a special case for it.
 
 Q3: The link of the attachment in markdown file is not updated after I directly rename the attachment file, why?
 

@@ -21,23 +21,23 @@ export const zhCn = {
   },
 
   exception: {
-    addGlobal: "添加全局扩展名例外",
-    addFile: "添加本文件的扩展名例外",
-    addFolder: "添加本文件夹的扩展名例外",
+    addGlobal: "添加全局特例",
+    addFile: "添加本文件特例",
+    addFolder: "添加本文件夹特例",
     section: {
-      title: "例外：下列扩展名不走上面的值",
-      desc: "例外只改写被自定义的字段，其余跟随本层。",
+      title: "特例：下列扩展名单独取值，不适用上面的值",
+      desc: "特例不豁免任何规则，只改写被自定义的字段，其余跟随本层。",
     },
     extension: {
       name: "扩展名",
-      desc: "正则匹配附件的扩展名，列表自上而下首个命中生效。",
+      desc: "正则匹配附件的扩展名，不区分大小写，列表自上而下首个命中生效。",
       placeholder: "pdf|docx?",
     },
     inherit: "继承本层",
     customize: "自定义",
     inheritValue: "继承：{value}",
     emptyValue: "（空）",
-    remove: "删除本例外",
+    remove: "删除本特例",
     rootFolderDesc: "仅当上面的「附件保存根路径」不是「复制 Obsidian 设置」时使用。",
   },
 
@@ -76,7 +76,7 @@ export const zhCn = {
     },
     excludeExtension: {
       name: "不计为附件的扩展名",
-      desc: "将指定扩展名排除在附件范围之外，按正则表达式匹配不带点的扩展名。",
+      desc: "将指定扩展名排除在附件范围之外，正则匹配不带点的扩展名，不区分大小写。留空时，所有非笔记文件都被当作附件。",
       placeholder: "pdf|docx?|xlsx?|pptx?|zip|rar",
     },
     excludedPaths: {
@@ -136,11 +136,12 @@ export const zhCn = {
   },
 
   errors: {
-    canvasNotSupported: "不支持将 Canvas 作为扩展例外。",
-    markdownNotSupported: "不支持将 Markdown 作为扩展例外。",
-    extensionEmpty: "扩展例外不能为空。",
-    duplicateExtension: "重复的扩展例外。",
-    excludedExtension: "扩展例外不能是被排除的扩展。",
+    canvasNotSupported: "不支持把 Canvas 作为特例。",
+    markdownNotSupported: "不支持把 Markdown 作为特例。",
+    extensionEmpty: "特例的扩展名不能为空。",
+    duplicateExtension: "已存在同扩展名的特例。",
+    excludedExtension: "该扩展名已被「不计为附件的扩展名」排除，不能作为特例。",
+    exceptionRejected: "有特例卡片的扩展名未通过校验，请改成合法值或删除该卡片。",
     attachFormatEmpty: "附件名称不能为空。",
     attachFormatIllegalChar: "附件名称包含非法文件名字符：{char}",
     attachFormatUnknownVariable: "附件名称中存在未知变量：{name}",

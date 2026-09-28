@@ -5,7 +5,8 @@ import AttachmentManagementPlugin from "../main";
 import { createLayerBox, renderExceptionArea, renderOrderLegend } from "../settings/exceptionArea";
 import { attachFolderSuggest } from "../lib/folderSuggest";
 import { debugLog } from "../lib/log";
-import { info } from "../lib/logger";
+import { info, warn } from "../lib/logger";
+import { generateErrorExtensionMessage, validateExtensionEntry } from "../utils";
 import { t } from "../i18n/index";
 
 export class OverrideModal extends Modal {
@@ -124,7 +125,7 @@ export class OverrideModal extends Modal {
           }),
       );
 
-    renderExceptionArea(layer, {
+    const exceptionArea = renderExceptionArea(layer, {
       plugin: this.plugin,
       layer: this.setting,
       scope: isFolder ? "folder" : "file",
@@ -154,6 +155,29 @@ export class OverrideModal extends Modal {
           .setButtonText(t("override.buttons.submit"))
           .setCta()
           .onClick(async () => {
+            // The exception editor only marks a bad entry; this dialog still writes the
+            // whole layer on 确认, so re-check here or an excluded extension would be saved.
+            const invalidEntry = validateExtensionEntry(this.setting, this.plugin.settings)[0];
+            if (invalidEntry !== undefined) {
+              warn("ui:override", "override submit blocked", {
+                target: this.file.path,
+                reason: "invalid_exception",
+                errorType: invalidEntry.type,
+                entryIndex: invalidEntry.index,
+              });
+              generateErrorExtensionMessage(invalidEntry.type);
+              return;
+            }
+            // Rejected text is never written into the layer, so the check above cannot see it.
+            // Without this the dialog would close and silently drop the extension just typed.
+            if (exceptionArea.hasRejectedInput()) {
+              warn("ui:override", "override submit blocked", {
+                target: this.file.path,
+                reason: "rejected_exception_input",
+              });
+              new Notice(t("errors.exceptionRejected"));
+              return;
+            }
             if (this.file instanceof TFile) {
               this.setting.type = SETTINGS_TYPES.FILE;
             } else if (this.file instanceof TFolder) {

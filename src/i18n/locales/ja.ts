@@ -21,23 +21,23 @@ export const ja = {
   },
 
   exception: {
-    addGlobal: "グローバル拡張子例外を追加",
-    addFile: "このファイルの拡張子例外を追加",
-    addFolder: "このフォルダの拡張子例外を追加",
+    addGlobal: "グローバル特例を追加",
+    addFile: "このファイルの特例を追加",
+    addFolder: "このフォルダの特例を追加",
     section: {
-      title: "例外：以下の拡張子は上記の値を使用しません",
-      desc: "例外はカスタマイズしたフィールドだけを書き換え、残りはこの階層に従います。",
+      title: "特例：以下の拡張子は上記の値を使用せず、個別の値を使用します",
+      desc: "特例はルールを免除するものではなく、カスタマイズしたフィールドだけを書き換え、残りはこの階層に従います。",
     },
     extension: {
       name: "拡張子",
-      desc: "添付ファイルの拡張子に一致する正規表現。リストの上から順に、最初に一致したものが有効です。",
+      desc: "添付ファイルの拡張子に一致する正規表現（大文字小文字は区別しません）。リストの上から順に、最初に一致したものが有効です。",
       placeholder: "pdf|docx?",
     },
     inherit: "この階層を継承",
     customize: "カスタマイズ",
     inheritValue: "継承：{value}",
     emptyValue: "（空）",
-    remove: "この例外を削除",
+    remove: "この特例を削除",
     rootFolderDesc: "上の「添付ファイルの保存先ルートパス」が「Obsidian の設定をコピー」でない場合のみ使用します。",
   },
 
@@ -76,7 +76,7 @@ export const ja = {
     },
     excludeExtension: {
       name: "添付ファイルに含めない拡張子",
-      desc: "指定した拡張子は添付ファイルとして扱いません。先頭のドットを除いた拡張子に正規表現でマッチします。",
+      desc: "指定した拡張子は添付ファイルとして扱いません。先頭のドットを除いた拡張子に正規表現でマッチします（大文字小文字は区別しません）。空の場合、ノート以外のファイルはすべて添付ファイルとして扱われます。",
       placeholder: "pdf|docx?|xlsx?|pptx?|zip|rar",
     },
     excludedPaths: {
@@ -136,11 +136,12 @@ export const ja = {
   },
 
   errors: {
-    canvasNotSupported: "Canvas は拡張子例外としてサポートされていません。",
-    markdownNotSupported: "Markdown は拡張子例外としてサポートされていません。",
-    extensionEmpty: "拡張子例外は空にできません。",
-    duplicateExtension: "重複した拡張子例外。",
-    excludedExtension: "拡張子例外は、除外された拡張子にできません。",
+    canvasNotSupported: "Canvas は特例にできません。",
+    markdownNotSupported: "Markdown は特例にできません。",
+    extensionEmpty: "特例の拡張子は空にできません。",
+    duplicateExtension: "同じ拡張子の特例が既にあります。",
+    excludedExtension: "この拡張子は「添付ファイルに含めない拡張子」で除外されているため、特例にできません。",
+    exceptionRejected: "特例カードの拡張子が検証に通っていません。修正するか、そのカードを削除してください。",
     attachFormatEmpty: "添付ファイル名を空にできません。",
     attachFormatIllegalChar: "添付ファイル名に不正なファイル名文字が含まれています：{char}",
     attachFormatUnknownVariable: "添付ファイル名内の未知の変数：{name}",
