@@ -547,7 +547,7 @@ export default class AttachmentManagementPlugin extends Plugin {
    */
   initCommands() {
     this.addCommand({
-      id: "attachment-management-rearrange-all-links",
+      id: "attachment-location-manager-rearrange-all-links",
       name: t("commands.rearrangeAllLinks"),
       callback: async () => {
         info("cmd:arrange", "command invoked", {
@@ -560,7 +560,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "attachment-management-rearrange-active-links",
+      id: "attachment-location-manager-rearrange-active-links",
       name: t("commands.rearrangeActiveLinks"),
       callback: async () => {
         const activeFile = getActiveFile(this.app);
@@ -586,7 +586,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "attachment-management-override-setting",
+      id: "attachment-location-manager-override-setting",
       name: t("commands.overrideSetting"),
       checkCallback: (checking: boolean) => {
         const file = getActiveFile(this.app);
@@ -621,7 +621,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     // is refreshed whenever the active note changes. With no note open the path is empty,
     // but `checkCallback` hides the command in that state, so the empty name is never shown.
     const resetOverrideCommand = this.addCommand({
-      id: "attachment-management-reset-override-setting",
+      id: "attachment-location-manager-reset-override-setting",
       name: t("commands.resetOverrideSetting", { path: getActiveFile(this.app)?.path ?? "" }),
       checkCallback: (checking: boolean) => {
         const file = getActiveFile(this.app);
@@ -682,7 +682,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     );
 
     this.addCommand({
-      id: "attachment-management-clear-unused-originalname-storage",
+      id: "attachment-location-manager-clear-unused-originalname-storage",
       name: t("commands.clearUnusedStorage"),
       callback: async () => {
         // An async command callback's rejection is not observed by Obsidian, so without

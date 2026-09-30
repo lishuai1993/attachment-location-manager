@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-attachment-management",
+	"name": "obsidian-attachment-location-manager",
 	"version": "1.0.0",
-	"description": "Attachment paths resolved by layer — global, folder, file — each with per-extension exceptions, plus variables and auto rename.",
+	"description": "Set attachment location per note or folder: global, folder and file settings resolve by nearest match, each with its own per-extension exceptions; supports variables, auto-rename and re-arranging existing links.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
@@ -15,7 +15,7 @@
 		"attachment",
 		"plugins"
 	],
-	"author": "trganda",
+	"author": "lishuai1993",
 	"license": "MIT",
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

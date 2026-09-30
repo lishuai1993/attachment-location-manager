@@ -1,10 +1,10 @@
 {
-	"id": "attachment-management-plus",
-	"name": "Attachment Management Plus",
+	"id": "attachment-location-manager",
+	"name": "Attachment Location Manager",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Attachment paths resolved by layer — global, folder, file — each with per-extension exceptions, plus variables and auto rename.",
+	"description": "Set attachment location per note or folder: global, folder and file settings resolve by nearest match, each with its own per-extension exceptions; supports variables, auto-rename and re-arranging existing links.",
 	"author": "lishuai1993",
-	"authorUrl": "https://github.com/lishuai1993/attachment-management.git",
+	"authorUrl": "https://github.com/lishuai1993",
 	"isDesktopOnly": false
 }
