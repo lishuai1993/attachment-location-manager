@@ -3,7 +3,6 @@ import {
   AttachmentManagementPluginSettings,
   AttachmentPathSettings,
   DEFAULT_SETTINGS,
-  SETTINGS_TYPES,
   AttachmentManagementSettingTab,
 } from "./settings/settings";
 import { debugLog } from "./lib/log";
@@ -12,19 +11,14 @@ import { OverrideModal } from "./model/override";
 import { initI18n, t } from "./i18n/index";
 import { ConfirmModal } from "./model/confirm";
 import { checkEmptyFolder, getActiveFile } from "./commons";
-import {
-  auditOverrideKeys,
-  deleteOverrideSetting,
-  getOverrideSetting,
-  getRenameOverrideSetting,
-  updateOverrideSetting,
-} from "./override";
+import { auditOverrideKeys, deleteOverrideSetting, getOverrideSetting, updateOverrideSetting } from "./override";
 import { isNonNoteFile, isMarkdownFile, isCanvasFile, matchExtension, md5sum } from "./utils";
-import { ArrangeHandler, RearrangeType } from "./arrange";
+import { arrangeResultNotice, ArrangeHandler, RearrangeType } from "./arrange";
 import { CreateHandler } from "./create";
 import { isExcluded } from "./exclude";
 import { getMetadata } from "./settings/metadata";
 import { findWikiLink, wikiLinkTarget } from "./lib/embed";
+import { consumeProgrammaticWrite } from "./lib/pendingWrites";
 
 // Normally a queued attachment is consumed within a modify event or two. If its link never
 // appears (the note is never written, or another plugin rewrites the embed into a form we
@@ -76,8 +70,9 @@ export default class AttachmentManagementPlugin extends Plugin {
     });
 
     // Stale override keys silently disable their own override: a key is matched by
-    // exact path (file) or path prefix (folder), so a key pointing at a path that no
-    // longer exists can never match again and the setting silently falls back to global.
+    // exact path (file) or path prefix (folder) and its stored type must agree with
+    // the vault, so a key pointing at a vanished path — or at something of another
+    // kind — can never match again and the setting silently falls back to global.
     const overrideAudit = auditOverrideKeys(this.app, this.settings);
     info("res:override", "override keys audit", {
       total: overrideAudit.total,
@@ -88,6 +83,13 @@ export default class AttachmentManagementPlugin extends Plugin {
         count: overrideAudit.stale.length,
         keys: overrideAudit.stale,
         reason: "stale_override_key",
+      });
+    }
+    if (overrideAudit.mismatched.length > 0) {
+      warn("res:override", "type-mismatched override keys detected", {
+        count: overrideAudit.mismatched.length,
+        keys: overrideAudit.mismatched,
+        reason: "type_mismatched_override_key",
       });
     }
 
@@ -135,6 +137,17 @@ export default class AttachmentManagementPlugin extends Plugin {
           // only processing creatation of file, ignore folder creation
           if (!(file instanceof TFile)) {
             trace("evt:create", "skip: not a file", { path: file.path, reason: "not_a_file" });
+            return;
+          }
+
+          // A file this plugin placed itself (a rearrange split's copy or moved original).
+          // Obsidian fires `create` from its file watcher for our own writes too, so
+          // without this the fresh copy would look like a paste and get moved again.
+          if (consumeProgrammaticWrite(file.path)) {
+            trace("evt:create", "skip: programmatic write", {
+              path: file.path,
+              reason: "programmatic_write",
+            });
             return;
           }
 
@@ -235,16 +248,16 @@ export default class AttachmentManagementPlugin extends Plugin {
             return;
           }
 
-          const { setting, settingPath } = getRenameOverrideSetting(this.settings, file, oldPath);
-          info("res:override", "rename: override resolution", {
-            newPath: file.path,
-            oldPath: oldPath,
-            settingPath: settingPath,
-            settingType: setting.type,
-          });
-          // update the override setting
-          if (setting.type === SETTINGS_TYPES.FOLDER || setting.type === SETTINGS_TYPES.FILE) {
-            updateOverrideSetting(this.settings, file, oldPath);
+          // Resolved before the re-key below: this describes the setting as it stood at
+          // oldPath, which is what the old attachment-folder cleanup further down needs.
+          const { setting } = getOverrideSetting(this.settings, file, oldPath);
+          const { moved } = updateOverrideSetting(this.settings, file, oldPath);
+          if (moved.length > 0) {
+            info("res:override", "override keys re-keyed on rename", {
+              newPath: file.path,
+              oldPath: oldPath,
+              moved: moved,
+            });
             this.saveSettings().catch((err) => {
               // The re-keyed override is only in memory; a failed write means the rename
               // is undone on the next reload and the override silently stops matching.
@@ -360,10 +373,14 @@ export default class AttachmentManagementPlugin extends Plugin {
           }
 
           const keysBefore = Object.keys(this.settings.overridePath);
-          if (deleteOverrideSetting(this.settings, file)) {
+          const { removed } = deleteOverrideSetting(this.settings, file);
+          if (removed.length > 0) {
             await this.saveSettings();
             info("res:override", "override removed on delete", {
               path: file.path,
+              removed: removed,
+              exactKey: removed.includes(file.path),
+              descendantKeys: removed.filter((key) => key !== file.path),
               keysBefore: keysBefore,
               keysAfter: Object.keys(this.settings.overridePath),
             });
@@ -546,21 +563,24 @@ export default class AttachmentManagementPlugin extends Plugin {
       id: "attachment-management-rearrange-active-links",
       name: t("commands.rearrangeActiveLinks"),
       callback: async () => {
+        const activeFile = getActiveFile(this.app);
         info("cmd:arrange", "command invoked", {
           command: "rearrangeActiveLinks",
           autoRenameAttachment: this.settings.autoRenameAttachment,
-          activeFile: getActiveFile(this.app)?.path ?? "(none)",
+          activeFile: activeFile?.path ?? "(none)",
         });
-        // `.finally` alone means a rejected rearrange still showed "completed" and the
-        // rejection was unhandled, so a failed run was indistinguishable from a run that
-        // found nothing to do.
+        // This command has no `checkCallback`, so it stays in the palette with nothing
+        // focused. Without this the run scans nothing and would still report success.
+        if (activeFile === undefined) {
+          new Notice(t("notices.noActiveNote"));
+          return;
+        }
         new ArrangeHandler(this.settings, this.app)
           .rearrangeAttachment(RearrangeType.ACTIVE)
+          .then((result) => new Notice(arrangeResultNotice(result)))
           .catch((err) => {
             error("cmd:arrange", "rearrange failed", { command: "rearrangeActiveLinks", err: err });
-          })
-          .finally(() => {
-            new Notice(t("notices.arrangeCompleted"));
+            new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`);
           });
       },
     });

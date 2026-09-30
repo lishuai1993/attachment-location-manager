@@ -1,21 +1,42 @@
-import { App, TAbstractFile, TFolder } from "obsidian";
+import { App, TAbstractFile, TFile, TFolder } from "obsidian";
 import { AttachmentManagementPluginSettings, AttachmentPathSettings, SETTINGS_TYPES } from "./settings/settings";
 import { debugLog } from "./lib/log";
 import { info, trace, warn } from "./lib/logger";
-import { stripPaths } from "./utils";
+
+export interface OverrideKeyAudit {
+  total: number;
+  /** The vault has nothing at the key's path. */
+  stale: string[];
+  /** The vault has something at the key's path, but not the kind the key is stored as. */
+  mismatched: string[];
+}
 
 /**
- * List override keys whose path no longer exists in the vault. Such keys can never
- * be matched again (matching is by exact path or path prefix), so the override they
- * carry is silently dead and its former target falls back to the global setting.
+ * List override keys that can never match again. Matching is by exact path (file
+ * override) or path prefix (folder override), and a match additionally requires the
+ * stored `type` to agree with what is at that path, so both a vanished path and a
+ * type that no longer fits leave the override silently dead and its former target
+ * falling back to the global setting.
  */
-export function auditOverrideKeys(
-  app: App,
-  settings: AttachmentManagementPluginSettings,
-): { total: number; stale: string[] } {
+export function auditOverrideKeys(app: App, settings: AttachmentManagementPluginSettings): OverrideKeyAudit {
   const keys = Object.keys(settings.overridePath);
-  const stale = keys.filter((key) => app.vault.getAbstractFileByPath(key) === null);
-  return { total: keys.length, stale: stale };
+  const stale: string[] = [];
+  const mismatched: string[] = [];
+  for (const key of keys) {
+    const target = app.vault.getAbstractFileByPath(key);
+    if (target === null) {
+      stale.push(key);
+      continue;
+    }
+    const storedType = settings.overridePath[key].type;
+    if (
+      (storedType === SETTINGS_TYPES.FILE && !(target instanceof TFile)) ||
+      (storedType === SETTINGS_TYPES.FOLDER && !(target instanceof TFolder))
+    ) {
+      mismatched.push(key);
+    }
+  }
+  return { total: keys.length, stale: stale, mismatched: mismatched };
 }
 
 /**
@@ -145,159 +166,61 @@ export function getOverrideSetting(
 }
 
 /**
- * Return the best matched override settings for the file/folder on rename event.
- * We need this function to process the use case below:
- *  suppose you have override settings of a folder, and when your rename the folder,
- *  the override setting of oldPath may be updated and will not to be found
- *  in rename event that trigger by subpath of oldPath.
- * @param settings plugin setting
- * @param file file need to get setting
- * @param oldPath old path of the file, it it's be renamed (option)
- * @returns { settingPath: string; setting: AttachmentPathSettings }, the best matched setting,
- * where settingPath is the relate path of this setting, it should be same with input path or is the
- * subpath of the settingPath.
- */
-export function getRenameOverrideSetting(
-  settings: AttachmentManagementPluginSettings,
-  file: TAbstractFile,
-  oldPath: string,
-): { settingPath: string; setting: AttachmentPathSettings } {
-  const resolved = resolveRenameOverrideSetting(settings, file, oldPath);
-  info("res:override", "rename override resolved", {
-    newPath: file.path,
-    oldPath: oldPath,
-    settingPath: resolved.settingPath,
-    settingType: resolved.setting.type,
-  });
-  return resolved;
-}
-
-function resolveRenameOverrideSetting(
-  settings: AttachmentManagementPluginSettings,
-  file: TAbstractFile,
-  oldPath: string,
-): { settingPath: string; setting: AttachmentPathSettings } {
-  if (Object.keys(settings.overridePath).length === 0) {
-    return { settingPath: "", setting: settings.attachPath };
-  }
-
-  const { settingPath: np, setting: ns } = getOverrideSetting(settings, file);
-  const { settingPath: op, setting: os } = getOverrideSetting(settings, file, oldPath);
-
-  if (ns.type === SETTINGS_TYPES.GLOBAL) {
-    return { settingPath: op, setting: os };
-  }
-
-  if (os.type === SETTINGS_TYPES.GLOBAL) {
-    return { settingPath: np, setting: ns };
-  }
-
-  if (ns.type === SETTINGS_TYPES.FILE && os.type === SETTINGS_TYPES.FILE) {
-    // This should not happen
-    debugLog("getRenameOverrideSetting - both file type setting", np, op);
-    return { settingPath: "", setting: settings.attachPath };
-  }
-
-  if (ns.type === SETTINGS_TYPES.FILE && os.type === SETTINGS_TYPES.FOLDER) {
-    return { settingPath: np, setting: ns };
-  } else if (ns.type === SETTINGS_TYPES.FOLDER && os.type === SETTINGS_TYPES.FILE) {
-    return { settingPath: op, setting: os };
-  }
-
-  if (ns.type === SETTINGS_TYPES.FOLDER && os.type === SETTINGS_TYPES.FOLDER) {
-    const l = np.split("/").length;
-    const r = op.split("/").length;
-
-    if (l > r) {
-      return { settingPath: np, setting: ns };
-    } else if (l < r) {
-      return { settingPath: op, setting: os };
-    } else if (l === r) {
-      if (np !== op) {
-        // The caller re-keys `overridePath` using `settingPath`, so returning an empty
-        // path here leaves the old key behind and the override stops matching.
-        warn("res:override", "cascade rename with same-depth overrides", {
-          newPath: file.path,
-          oldPath: oldPath,
-          newSettingPath: np,
-          oldSettingPath: op,
-          reason: "same_depth_different_key",
-        });
-      }
-      // same case, np == op, return any one
-      return { settingPath: "", setting: os };
-    }
-  }
-
-  return { settingPath: "", setting: settings.attachPath };
-}
-
-/**
- * Update the override setting of the renamed file
- * @param settings plugin setting
- * @param file renamed file
- * @param oldPath old path of the renamed file
- * @returns
+ * Re-key every override whose path is the renamed target or sits under it.
+ *
+ * A key's path is its only identity, so a rename must carry the key with its target.
+ * Doing it by prefix makes the move idempotent and order-independent: Obsidian emits
+ * one `rename` event per descendant, and whichever arrives first performs the whole
+ * move while the rest find nothing left to move.
+ *
+ * @returns the keys actually re-keyed, so the caller can persist and report the change
  */
 export function updateOverrideSetting(
   settings: AttachmentManagementPluginSettings,
   file: TAbstractFile,
   oldPath: string,
-) {
-  const keys = Object.keys(settings.overridePath);
-  if (keys.length === 0 || file.path === oldPath) {
-    return;
+): { moved: { oldKey: string; newKey: string }[] } {
+  const moved: { oldKey: string; newKey: string }[] = [];
+  if (oldPath === file.path) {
+    return { moved: moved };
   }
 
-  const { settingPath, setting } = getOverrideSetting(settings, file, oldPath);
-  const copySetting = Object.assign({}, setting);
-
-  // if the file was overridden, skip
-  if (file.path === settingPath) {
-    return;
-  }
-
-  if (oldPath === settingPath) {
-    settings.overridePath[file.path] = copySetting;
-    delete settings.overridePath[settingPath];
-    info("res:override", "override key re-keyed on rename", {
-      oldKey: settingPath,
-      newKey: file.path,
-      type: copySetting.type,
-    });
-    return;
-  } else {
-    const { stripedSrc, stripedDst } = stripPaths(oldPath, file.path);
-    if (stripedSrc === settingPath) {
-      settings.overridePath[stripedDst] = copySetting;
-      delete settings.overridePath[settingPath];
-      info("res:override", "override key re-keyed on cascade rename", {
-        oldKey: settingPath,
-        newKey: stripedDst,
-        type: copySetting.type,
-      });
-      return;
+  const prefix = oldPath + "/";
+  for (const key of Object.keys(settings.overridePath)) {
+    if (key === oldPath) {
+      moved.push({ oldKey: key, newKey: file.path });
+    } else if (key.startsWith(prefix)) {
+      moved.push({ oldKey: key, newKey: file.path + key.slice(oldPath.length) });
     }
   }
+
+  for (const { oldKey, newKey } of moved) {
+    settings.overridePath[newKey] = settings.overridePath[oldKey];
+    delete settings.overridePath[oldKey];
+  }
+  return { moved: moved };
 }
 
-export function deleteOverrideSetting(settings: AttachmentManagementPluginSettings, file: TAbstractFile): boolean {
-  const keys = Object.keys(settings.overridePath);
-  const descendants = keys.filter((key) => key.startsWith(file.path + "/"));
-  for (const key of keys) {
-    if (file.path === key) {
+/**
+ * Remove the override of the deleted target together with every override keyed under
+ * it. Deleting a folder must take its descendants' overrides with it: a key left
+ * behind at a path that no longer exists is dead (matching is by exact path or path
+ * prefix), and if a note is later recreated at that same path the stale key silently
+ * resurrects the old setting.
+ *
+ * @returns the keys actually removed, so the caller can persist and report the change
+ */
+export function deleteOverrideSetting(
+  settings: AttachmentManagementPluginSettings,
+  file: TAbstractFile,
+): { removed: string[] } {
+  const removed: string[] = [];
+  const prefix = file.path + "/";
+  for (const key of Object.keys(settings.overridePath)) {
+    if (key === file.path || key.startsWith(prefix)) {
+      removed.push(key);
       delete settings.overridePath[key];
-      if (descendants.length > 0) {
-        // Only the exact key is removed. Descendant keys survive and will resurrect
-        // their old setting if a note is later recreated at the same path.
-        warn("res:override", "descendant override keys left behind", {
-          path: file.path,
-          descendants: descendants,
-          reason: "descendant_keys_not_cleaned",
-        });
-      }
-      return true;
     }
   }
-  return false;
+  return { removed: removed };
 }

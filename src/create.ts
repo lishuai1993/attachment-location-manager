@@ -1,4 +1,4 @@
-import { App, Plugin, Notice, TFile, TFolder, debounce, normalizePath, MarkdownView } from "obsidian";
+import { App, Plugin, Notice, TFile, TFolder, debounce, normalizePath } from "obsidian";
 import { deduplicateNewName } from "./lib/deduplicate";
 import { path } from "./lib/path";
 import { debugLog } from "./lib/log";
@@ -10,7 +10,7 @@ import { isExcluded } from "./exclude";
 import { getExtensionOverrideSetting } from "./lib/extension";
 import { md5sum } from "./utils";
 import { saveOriginalName } from "./lib/originalStorage";
-import { planLinkRewrite } from "./lib/embed";
+import { updateLinkInNote } from "./lib/relink";
 import { t } from "./i18n/index";
 
 // Batch rename notices so rapid renames (e.g. paste bursts, rearrange-driven
@@ -205,7 +205,7 @@ export class CreateHandler {
         debugLog("renameFile - old link:", oldLink, "new link:", newLink);
 
         // Manually update the link in the source file
-        this.updateLinkInSource(source, oldLink, newLink);
+        updateLinkInNote(this.app, source, oldLink, newLink, "pipe:paste");
       })
       .catch((err) => {
         error("pipe:paste", "rename failed", { note: source.path, attach: attach.path, dst: dst, err: err });
@@ -235,78 +235,6 @@ export class CreateHandler {
               err: err,
             });
           });
-      });
-  }
-
-  /**
-   * Update the old link to new link in the source file.
-   * For markdown files with an active editor, use editor.replaceRange to avoid file reload and cursor jump.
-   * For other cases (canvas, non-active files), fall back to adapter.process.
-   * @param source - the source file containing the link
-   * @param oldLink - the old link text to replace
-   * @param newLink - the new link text
-   */
-  private updateLinkInSource(source: TFile, oldLink: string, newLink: string) {
-    if (oldLink === newLink) {
-      trace("pipe:paste", "link unchanged, nothing to update", { note: source.path, link: oldLink });
-      return;
-    }
-
-    // For markdown files, try to use the editor API to avoid reload and cursor jump
-    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (mdView && mdView.file && mdView.file.path === source.path && mdView.editor) {
-      const editor = mdView.editor;
-      const content = editor.getValue();
-      const plan = planLinkRewrite(content, oldLink, newLink);
-      if (plan !== null) {
-        // Calculate line/ch positions for replaceRange using absolute offsets
-        const before = content.substring(0, plan.from);
-        const lines = before.split("\n");
-        const fromLine = lines.length - 1;
-        const fromCh = lines[fromLine].length;
-
-        const toBefore = content.substring(0, plan.to);
-        const toLines = toBefore.split("\n");
-        const toLine = toLines.length - 1;
-        const toCh = toLines[toLine].length;
-
-        // replaceRange preserves cursor position and does not trigger a file reload
-        editor.replaceRange(plan.text, { line: fromLine, ch: fromCh }, { line: toLine, ch: toCh });
-        trace("pipe:paste", "link updated via editor API", {
-          note: source.path,
-          from: oldLink,
-          to: newLink,
-          annotationPreserved: plan.annotationPreserved,
-        });
-        return;
-      }
-    }
-
-    // Fallback for canvas or non-active files: update via adapter.process
-    this.app.vault.adapter
-      .process(source.path, (data) => {
-        // Recompute against the on-disk content: offsets from the editor are stale here.
-        const plan = planLinkRewrite(data, oldLink, newLink);
-        if (plan === null) {
-          return data;
-        }
-        trace("pipe:paste", "link updated via adapter.process", {
-          note: source.path,
-          from: oldLink,
-          to: newLink,
-          annotationPreserved: plan.annotationPreserved,
-        });
-        return data.substring(0, plan.from) + plan.text + data.substring(plan.to);
-      })
-      .catch((err) => {
-        // The attachment moved but the link still points at the old path, i.e. the note
-        // is now broken. Nothing else reports this.
-        error("pipe:paste", "link update via adapter.process failed", {
-          note: source.path,
-          from: oldLink,
-          to: newLink,
-          err: err,
-        });
       });
   }
 }

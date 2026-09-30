@@ -38,48 +38,6 @@ export function isNonNoteFile(file: TAbstractFile | null): boolean {
 }
 
 /**
- * find the first prefix difference of two paths
- * e.g.:
- *   "Resources/Untitled/Untitled 313/Untitled"
- *   "Resources/Untitled1/Untitled 313/Untitled"
- * result:
- *   "Resources/Untitled"
- *   "Resources/Untitled1"
- * @param src source path
- * @param dst destination path
- * @returns the first different prefix, otherwise, return the original path
- */
-export function stripPaths(src: string, dst: string): { stripedSrc: string; stripedDst: string } {
-  if (src === dst) {
-    return { stripedSrc: src, stripedDst: dst };
-  }
-
-  const srcParts = src.split("/");
-  const dstParts = dst.split("/");
-
-  // if src and dst have difference count of parts,
-  // we think the paths was not in a same parent folder and no need to strip the prefix
-  if (srcParts.length !== dstParts.length) {
-    return { stripedSrc: src, stripedDst: dst };
-  }
-
-  for (let i = 0; i < srcParts.length; i++) {
-    const srcPart = srcParts[i];
-    const dstPart = dstParts[i];
-
-    // find the first different part
-    if (srcPart !== dstPart) {
-      return {
-        stripedSrc: srcParts.slice(0, i + 1).join("/"),
-        stripedDst: dstParts.slice(0, i + 1).join("/"),
-      };
-    }
-  }
-
-  return { stripedSrc: "", stripedDst: "" };
-}
-
-/**
  * Test if the extension is matched by pattern. Case-insensitive: Obsidian lowercases
  * `TFile.extension`, but the pattern is typed by the user and may not be.
  * @param extension extension of a file

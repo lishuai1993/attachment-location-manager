@@ -86,6 +86,25 @@ export const en = {
       name: "Include subfolders",
       desc: "Applies to subfolders of the folders above as well.",
     },
+    overrideList: {
+      name: "Overrides",
+      empty: "No override yet. Right-click a file or folder and pick “Override global attachment settings”.",
+      typeFile: "File override",
+      typeFolder: "Folder override",
+      kindFile: "file",
+      kindFolder: "folder",
+      // The trailing space is the joiner before the status element that follows.
+      overview: "Overview: {type}, ",
+      valueEmpty: "(empty)",
+      fieldMode: "Root mode: {value}",
+      fieldRoot: "Root: {value}",
+      fieldPath: "Folder: {value}",
+      fieldFormat: "Name: {value}",
+      statusOk: "target exists",
+      statusMissing: "target no longer exists — this override is dead",
+      statusMismatch: "but a {actual} now sits at this path — this override is dead",
+      remove: "Remove this override",
+    },
     diagnostics: {
       name: "Diagnostics",
       enable: {
@@ -120,7 +139,9 @@ export const en = {
     overrideRemoved: "Removed the override of {path}",
     fileRenamed: "Renamed {from} to {to}",
     filesRenamedBatch: "Renamed {count} attachments",
-    arrangeCompleted: "Arrange completed",
+    arrangeNothingFound: "Nothing to rearrange",
+    arrangeSummary: "Arrange finished: {moved} moved, {copied} copied, {skipped} skipped, {failed} failed",
+    noActiveNote: "Open a note or canvas first",
     resetAttachmentSetting: "Removed the override of {path}",
     error: {
       unknownError: "An unknown error occurred",

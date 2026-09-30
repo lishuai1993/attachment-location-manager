@@ -87,6 +87,25 @@ export const ja = {
       name: "サブフォルダも同様",
       desc: "上記フォルダのサブフォルダにも適用されます。",
     },
+    overrideList: {
+      name: "上書き一覧",
+      empty:
+        "上書きはまだありません。ファイルまたはフォルダを右クリックし、「グローバル添付ファイル設定を上書き」を選ぶと追加できます。",
+      typeFile: "ファイルの上書き",
+      typeFolder: "フォルダの上書き",
+      kindFile: "ファイル",
+      kindFolder: "フォルダ",
+      overview: "概要：{type}、",
+      valueEmpty: "（空）",
+      fieldMode: "ルート方式：{value}",
+      fieldRoot: "ルート：{value}",
+      fieldPath: "フォルダ：{value}",
+      fieldFormat: "名前：{value}",
+      statusOk: "対象は存在します",
+      statusMissing: "対象が存在しません — この上書きは無効です",
+      statusMismatch: "このパスには{actual}があります — この上書きは無効です",
+      remove: "この上書きを削除",
+    },
     diagnostics: {
       name: "診断",
       enable: {
@@ -120,7 +139,9 @@ export const ja = {
     overrideRemoved: "{path} の上書きを削除しました",
     fileRenamed: "{from} から {to} にリネームしました",
     filesRenamedBatch: "{count} 件の添付ファイルをリネームしました",
-    arrangeCompleted: "整理が完了しました",
+    arrangeNothingFound: "整理する添付ファイルはありません",
+    arrangeSummary: "整理が完了しました：移動 {moved}、コピー {copied}、スキップ {skipped}、失敗 {failed}",
+    noActiveNote: "先にノートまたは canvas を開いてください",
     resetAttachmentSetting: "{path} の上書きを削除しました",
     error: {
       unknownError: "不明なエラーが発生しました",

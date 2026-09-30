@@ -1,6 +1,6 @@
 import { Modal, Notice, Setting, setIcon } from "obsidian";
 import AttachmentManagementPlugin from "../main";
-import { ArrangeHandler, RearrangeType } from "../arrange";
+import { ArrangeHandler, arrangeResultNotice, RearrangeType } from "../arrange";
 import { error, info } from "../lib/logger";
 import { t } from "../i18n/index";
 
@@ -55,7 +55,7 @@ export class ConfirmModal extends Modal {
             });
             new ArrangeHandler(this.plugin.settings, this.plugin.app)
               .rearrangeAttachment(RearrangeType.LINKS)
-              .then(() => new Notice(t("notices.arrangeCompleted")))
+              .then((result) => new Notice(arrangeResultNotice(result)))
               .catch((err) => {
                 error("ui:confirm", "rearrange all links failed", { err: err });
                 new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`);

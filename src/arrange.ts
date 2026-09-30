@@ -1,15 +1,18 @@
-import { App, TFile, TFolder } from "obsidian";
+import { App, TFile, TFolder, normalizePath } from "obsidian";
 import { path } from "./lib/path";
 import { debugLog } from "./lib/log";
 import { error, info, trace, warn, warnOnce } from "./lib/logger";
 import { getOverrideSetting } from "./override";
-import { isAttachment, isNonNoteFile } from "./utils";
+import { isAttachment, isNonNoteFile, md5sum } from "./utils";
 import { AttachmentManagementPluginSettings, AttachmentPathSettings } from "./settings/settings";
 import { SETTINGS_VARIABLES_DATES, SETTINGS_VARIABLES_NOTENAME } from "./lib/constant";
 import { deduplicateNewName } from "./lib/deduplicate";
 import { getMetadata } from "./settings/metadata";
 import { getActiveFile } from "./commons";
 import { isExcluded } from "./exclude";
+import { updateLinkInNote } from "./lib/relink";
+import { markProgrammaticWrite } from "./lib/pendingWrites";
+import { t } from "./i18n/index";
 
 // const bannerRegex = /!\[\[(.*?)\]\]/i;
 
@@ -19,9 +22,37 @@ export enum RearrangeType {
   FILE,
 }
 
+/** What a run actually did, so the caller reports it instead of a bare "done". */
+export interface RearrangeResult {
+  moved: number;
+  copied: number;
+  skipped: number;
+  failed: number;
+}
+
+/**
+ * Notice text for a finished run. A run that found nothing and a run that finished
+ * both used to print "Arrange completed", so an empty vault and a real rearrange
+ * were indistinguishable.
+ */
+export function arrangeResultNotice(result: RearrangeResult): string {
+  if (result.moved + result.copied + result.failed === 0) {
+    return t("notices.arrangeNothingFound");
+  }
+  return t("notices.arrangeSummary", {
+    moved: result.moved,
+    copied: result.copied,
+    skipped: result.skipped,
+    failed: result.failed,
+  });
+}
+
 export class ArrangeHandler {
   pluginSettings: AttachmentManagementPluginSettings;
   app: App;
+
+  /** Note the run was invoked from, when there is one. A split keeps the original here. */
+  private focusNotePath?: string;
 
   constructor(settings: AttachmentManagementPluginSettings, app: App) {
     this.pluginSettings = settings;
@@ -30,13 +61,17 @@ export class ArrangeHandler {
 
   /**
    * Rearranges attachments that are linked by markdown or canvas.
-   * Only rearranges attachments if autoRenameAttachment is enabled in settings.
+   *
+   * The `FILE` type is only reached from the `rename` event, whose caller already
+   * gates on `autoRenameAttachment`; the two explicit commands (`ACTIVE` / `LINKS`)
+   * are deliberate user intent and must not be gated by a setting described as
+   * "rename the attachment when you rename the note".
    *
    * @param {RearrangeType} type - The type of attachments to rearrange.
    * @param {TFile} file - The file to which the attachments are linked (optional), if the type was "file", thi should be provided.
    * @param {string} oldPath - The old path of the file (optional), used for rename event.
    */
-  async rearrangeAttachment(type: RearrangeType, file?: TFile, oldPath?: string) {
+  async rearrangeAttachment(type: RearrangeType, file?: TFile, oldPath?: string): Promise<RearrangeResult> {
     const startedAt = Date.now();
     info("cmd:arrange", "rearrange start", {
       type: RearrangeType[type],
@@ -45,18 +80,15 @@ export class ArrangeHandler {
       autoRenameAttachment: this.pluginSettings.autoRenameAttachment,
     });
 
-    if (!this.pluginSettings.autoRenameAttachment) {
-      debugLog("rearrangeAttachment - autoRenameAttachment not enable");
-      warn("cmd:arrange", "rearrange aborted", {
-        type: RearrangeType[type],
-        autoRenameAttachment: this.pluginSettings.autoRenameAttachment,
-        reason: "gate_disabled",
-      });
-      return;
-    }
-
     // only rearrange attachment that linked by markdown or canvas
     const attachments = await this.getAttachmentsInVault(this.pluginSettings, type, file, oldPath);
+    if (type === RearrangeType.ACTIVE) {
+      this.focusNotePath = getActiveFile(this.app)?.path;
+    } else if (type === RearrangeType.FILE) {
+      this.focusNotePath = file?.path;
+    } else {
+      this.focusNotePath = undefined;
+    }
     debugLog("rearrangeAttachment - attachments:", Object.keys(attachments).length, Object.entries(attachments));
     info("cmd:arrange", "scan complete", {
       type: RearrangeType[type],
@@ -64,11 +96,38 @@ export class ArrangeHandler {
       attachCount: Object.values(attachments).reduce((sum, links) => sum + links.size, 0),
     });
 
-    if (type === RearrangeType.LINKS) {
-      this.reportSharedAttachments(attachments);
+    // Reverse index over the whole vault, so a shared attachment is recognized in
+    // ACTIVE/FILE mode too — those scans only cover a single note. Restricted to the
+    // attachments this scan actually links, and built before any side effect so the
+    // split decision does not depend on traversal order.
+    const candidates = new Set<string>();
+    for (const links of Object.values(attachments)) {
+      for (const link of links) {
+        candidates.add(link);
+      }
     }
+    const refs = this.collectRefs(candidates);
+    const splitPlans = await this.planSplits(refs);
+    if (splitPlans.size === 0) {
+      trace("cmd:arrange", "no shared attachment needs splitting", { candidateAttachments: refs.size });
+    } else {
+      warn("cmd:arrange", "shared attachments will be split by target", {
+        count: splitPlans.size,
+        candidateAttachments: refs.size,
+        sample: Array.from(splitPlans.entries())
+          .slice(0, 20)
+          .map(([attach, targets]) => ({
+            attach: attach,
+            refCount: refs.get(attach)?.size ?? 0,
+            distinctTargets: new Set(targets.values()).size,
+          })),
+        behavior: "split_by_target",
+      });
+    }
+    const handledSplits = new Set<string>();
 
     let moved = 0;
+    let copied = 0;
     let skipped = 0;
     let failed = 0;
 
@@ -120,6 +179,26 @@ export class ArrangeHandler {
           continue;
         }
         debugLog(`rearrangeAttachment - article: ${obNote} links: ${link}`);
+
+        // A split is applied once, for the attachment; later notes referencing the same
+        // attachment find their link already rewritten.
+        if (handledSplits.has(link)) {
+          trace("cmd:arrange", "skip link", { note: obNote, link: link, reason: "already_split" });
+          continue;
+        }
+        const splitTargets = splitPlans.get(link);
+        if (splitTargets !== undefined) {
+          const ok = await this.applySplit(link, splitTargets, refs.get(link) ?? new Set<string>());
+          if (ok) {
+            handledSplits.add(link);
+            moved += 1;
+            copied += new Set(splitTargets.values()).size - 1;
+          } else {
+            failed += 1;
+          }
+          continue;
+        }
+
         const linkFile = this.app.vault.getAbstractFileByPath(link);
         if (linkFile === null || !(linkFile instanceof TFile)) {
           debugLog(`${link} not exists, skipped`);
@@ -190,41 +269,193 @@ export class ArrangeHandler {
     info("cmd:arrange", "rearrange finished", {
       type: RearrangeType[type],
       moved: moved,
+      copied: copied,
       skipped: skipped,
       failed: failed,
       elapsedMs: Date.now() - startedAt,
     });
+    return { moved, copied, skipped, failed };
   }
 
   /**
-   * Report attachments referenced by more than one note. The current implementation
-   * moves the shared attachment to the target path of whichever note is processed
-   * first and rewrites every other note's link to that location, so the remaining
-   * notes are silently skipped and no copy is created.
+   * Reverse index `attachment path -> notes that link to it`, over the whole vault.
+   * Only the paths in `candidates` are indexed, which keeps the async target resolution
+   * in {@link planSplits} bounded by the current scan.
    */
-  private reportSharedAttachments(attachments: Record<string, Set<string>>) {
-    const refs = new Map<string, string[]>();
-    for (const [note, links] of Object.entries(attachments)) {
-      for (const link of links) {
-        const notes = refs.get(link);
-        if (notes === undefined) {
-          refs.set(link, [note]);
-        } else {
-          notes.push(note);
+  private collectRefs(candidates: Set<string>): Map<string, Set<string>> {
+    const refs = new Map<string, Set<string>>();
+    const resolvedLinks = this.app.metadataCache.resolvedLinks;
+    for (const [note, links] of Object.entries(resolvedLinks)) {
+      if (links === undefined) {
+        continue;
+      }
+      for (const filePath of Object.keys(links)) {
+        if (!candidates.has(filePath)) {
+          continue;
         }
+        if (!isAttachment(this.app, this.pluginSettings, filePath)) {
+          continue;
+        }
+        let notes = refs.get(filePath);
+        if (notes === undefined) {
+          notes = new Set<string>();
+          refs.set(filePath, notes);
+        }
+        notes.add(note);
       }
     }
-    const shared = Array.from(refs.entries()).filter(([, notes]) => notes.length > 1);
-    if (shared.length === 0) {
-      info("cmd:arrange", "no shared attachments", { uniqueAttachments: refs.size });
-      return;
+    return refs;
+  }
+
+  /**
+   * For every attachment referenced by more than one note, resolve each referencing
+   * note's full target path. Only attachments landing on two or more distinct targets
+   * are returned — a shared attachment with a single target is a plain move.
+   */
+  private async planSplits(refs: Map<string, Set<string>>): Promise<Map<string, Map<string, string>>> {
+    const plans = new Map<string, Map<string, string>>();
+    for (const [attachPath, notes] of refs.entries()) {
+      if (notes.size < 2) {
+        continue;
+      }
+      const attachFile = this.app.vault.getAbstractFileByPath(attachPath);
+      if (attachFile === null || !(attachFile instanceof TFile)) {
+        continue;
+      }
+      const targets = new Map<string, string>();
+      for (const notePath of notes) {
+        const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+        if (noteFile === null || !(noteFile instanceof TFile)) {
+          continue;
+        }
+        const { setting } = getOverrideSetting(this.pluginSettings, noteFile);
+        const metadata = getMetadata(notePath, attachFile);
+        const attachPathForNote = metadata.getAttachmentPath(setting);
+        const attachName = await metadata.getAttachFileName(
+          setting,
+          this.pluginSettings.dateFormat,
+          attachFile,
+          this.app.vault.adapter,
+          this.pluginSettings,
+        );
+        targets.set(notePath, normalizePath(path.join(attachPathForNote, attachName + "." + attachFile.extension)));
+      }
+      if (new Set(targets.values()).size < 2) {
+        continue;
+      }
+      plans.set(attachPath, targets);
     }
-    warn("cmd:arrange", "shared attachments detected", {
-      count: shared.length,
-      uniqueAttachments: refs.size,
-      sample: shared.slice(0, 20).map(([attach, notes]) => ({ attach: attach, refCount: notes.length, notes: notes })),
-      behavior: "current_move_first_wins",
-    });
+    return plans;
+  }
+
+  /**
+   * Place one file per distinct target: the original moves to `home`, every other target
+   * gets a copy, then each referencing note's link is rewritten to its own file. Doing
+   * all placements and rewrites in one pass is what makes the result independent of the
+   * order the notes were traversed in.
+   */
+  private async applySplit(attachPath: string, targets: Map<string, string>, notePaths: Set<string>): Promise<boolean> {
+    const attachFile = this.app.vault.getAbstractFileByPath(attachPath);
+    if (attachFile === null || !(attachFile instanceof TFile)) {
+      warn("cmd:arrange", "split skipped", { attach: attachPath, reason: "link_target_missing" });
+      return false;
+    }
+
+    const home = this.pickSplitHome(targets);
+
+    // Links must be read before the move: generateMarkdownLink resolves against file.path.
+    const oldLinks = new Map<string, string>();
+    for (const notePath of notePaths) {
+      const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+      if (noteFile === null || !(noteFile instanceof TFile)) {
+        continue;
+      }
+      oldLinks.set(notePath, this.app.fileManager.generateMarkdownLink(attachFile, notePath));
+    }
+
+    try {
+      const distinct = Array.from(new Set(targets.values()));
+      for (const target of distinct) {
+        // A target directly in the vault root has no directory part; `""` would make
+        // exists/mkdir meaningless, and the root folder always exists.
+        const dir = path.dirname(target) || "/";
+        if (!(await this.app.vault.adapter.exists(dir, true))) {
+          await this.app.vault.adapter.mkdir(dir);
+          info("res:path", "attachment folder created", { path: dir });
+        }
+      }
+
+      markProgrammaticWrite(home);
+      await this.app.vault.rename(attachFile, home);
+      info("cmd:arrange", "shared attachment moved to home", {
+        from: attachPath,
+        to: home,
+        refCount: notePaths.size,
+      });
+      const placed = new Map<string, TFile>([[home, attachFile]]);
+
+      for (const target of distinct) {
+        if (target === home) {
+          continue;
+        }
+        const existing = this.app.vault.getAbstractFileByPath(target);
+        if (existing instanceof TFile) {
+          const [existingMd5, sourceMd5] = await Promise.all([
+            md5sum(this.app.vault.adapter, existing),
+            md5sum(this.app.vault.adapter, attachFile),
+          ]);
+          if (existingMd5 !== "" && existingMd5 === sourceMd5) {
+            warn("cmd:arrange", "copy skipped as already identical", { attach: attachPath, target: target });
+            placed.set(target, existing);
+            continue;
+          }
+        }
+        const targetDir = path.dirname(target) || "/";
+        const folder = this.app.vault.getAbstractFileByPath(targetDir);
+        let dst = target;
+        if (folder instanceof TFolder) {
+          const { name } = await deduplicateNewName(path.basename(target), folder);
+          dst = normalizePath(path.join(targetDir, name));
+        }
+        markProgrammaticWrite(dst);
+        const copy = await this.app.vault.copy(attachFile, dst);
+        info("cmd:arrange", "shared attachment copied", { from: home, to: dst });
+        placed.set(target, copy);
+      }
+
+      for (const [notePath, oldLink] of oldLinks.entries()) {
+        const target = targets.get(notePath);
+        if (target === undefined) {
+          continue;
+        }
+        const placedFile = placed.get(target);
+        const noteFile = this.app.vault.getAbstractFileByPath(notePath);
+        if (placedFile === undefined || noteFile === null || !(noteFile instanceof TFile)) {
+          continue;
+        }
+        const newLink = this.app.fileManager.generateMarkdownLink(placedFile, notePath);
+        updateLinkInNote(this.app, noteFile, oldLink, newLink, "cmd:arrange");
+      }
+      return true;
+    } catch (err) {
+      error("cmd:arrange", "split failed", { attach: attachPath, home: home, err: err });
+      return false;
+    }
+  }
+
+  /**
+   * The original stays with the note the command was invoked from; with no such note
+   * (Rearrange all linked attachments) the lexicographically first target wins, which
+   * keeps the choice reproducible.
+   */
+  private pickSplitHome(targets: Map<string, string>): string {
+    if (this.focusNotePath !== undefined) {
+      const own = targets.get(this.focusNotePath);
+      if (own !== undefined) {
+        return own;
+      }
+    }
+    return Array.from(new Set(targets.values())).sort()[0];
   }
 
   /**

@@ -338,7 +338,7 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
 
     // The button sits after the cards, so a new entry appears above it. It only ever opens
     // an empty draft card; nothing is written until that card gets a valid extension.
-    new Setting(area).addButton((button) => {
+    new Setting(area).setClass("attach_management_setting_indent").addButton((button) => {
       button.setButtonText(addLabel()).onClick(() => {
         if (draft === undefined) {
           draft = { extension: "" };

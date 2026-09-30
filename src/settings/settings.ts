@@ -1,4 +1,4 @@
-import { App, MomentFormatComponent, PluginSettingTab, Setting, TextAreaComponent } from "obsidian";
+import { App, MomentFormatComponent, Notice, PluginSettingTab, Setting, TextAreaComponent } from "obsidian";
 import AttachmentManagementPlugin from "../main";
 import {
   SETTINGS_ROOT_OBSFOLDER,
@@ -9,6 +9,7 @@ import {
   SETTINGS_ROOT_NEXTTONOTE,
 } from "../lib/constant";
 import { createLayerBox, renderExceptionArea, renderOrderLegend } from "./exceptionArea";
+import { auditOverrideKeys } from "../override";
 import {
   validateAttachFormat,
   attachFormatErrorMessage,
@@ -107,6 +108,25 @@ export const DEFAULT_SETTINGS: AttachmentManagementPluginSettings = {
   overridePath: {},
   disableNotification: false,
 };
+
+/** An unset field shows a placeholder; a blank value used to leave a dangling label. */
+function shownValue(value: string): string {
+  return value === "" ? t("settings.overrideList.valueEmpty") : value;
+}
+
+/** The three root-path modes have their own labels; a value outside them is shown raw. */
+function rootModeLabel(saveAttE: string): string {
+  switch (saveAttE) {
+    case SETTINGS_ROOT_OBSFOLDER:
+      return t("settings.rootPath.options.obsidian");
+    case SETTINGS_ROOT_INFOLDER:
+      return t("settings.rootPath.options.inFolder");
+    case SETTINGS_ROOT_NEXTTONOTE:
+      return t("settings.rootPath.options.nextToNote");
+    default:
+      return saveAttE;
+  }
+}
 
 export class AttachmentManagementSettingTab extends PluginSettingTab {
   plugin: AttachmentManagementPlugin;
@@ -347,6 +367,82 @@ export class AttachmentManagementSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    containerEl.createEl("h3", { text: t("settings.overrideList.name"), cls: "attach_management_tab_heading" });
+
+    // The layer box above is the global layer, so cross-layer overrides are otherwise
+    // invisible from here. Two of them are dead without ever raising an error — the
+    // target is gone, or the stored type no longer fits what is at that path — so both
+    // are called out per row rather than only in the log.
+    const overrideAudit = auditOverrideKeys(this.app, this.plugin.settings);
+    const staleKeys = new Set(overrideAudit.stale);
+    const mismatchedKeys = new Set(overrideAudit.mismatched);
+    const overrideKeys = Object.keys(this.plugin.settings.overridePath).sort();
+
+    if (overrideKeys.length === 0) {
+      containerEl.createEl("p", {
+        text: t("settings.overrideList.empty"),
+        cls: "attach_management_override_empty",
+      });
+    }
+
+    for (const key of overrideKeys) {
+      const override = this.plugin.settings.overridePath[key];
+      const isFileOverride = override.type === SETTINGS_TYPES.FILE;
+      const typeLabel = isFileOverride ? t("settings.overrideList.typeFile") : t("settings.overrideList.typeFolder");
+
+      let status: string;
+      let isDead = false;
+      if (staleKeys.has(key)) {
+        status = t("settings.overrideList.statusMissing");
+        isDead = true;
+      } else if (mismatchedKeys.has(key)) {
+        status = t("settings.overrideList.statusMismatch", {
+          actual: isFileOverride ? t("settings.overrideList.kindFolder") : t("settings.overrideList.kindFile"),
+        });
+        isDead = true;
+      } else {
+        status = t("settings.overrideList.statusOk");
+      }
+
+      new Setting(containerEl)
+        .setName(key)
+        .setDesc(
+          createFragment((frag) => {
+            frag.appendText(t("settings.overrideList.overview", { type: typeLabel }));
+            frag.createEl("span", {
+              text: status,
+              cls: isDead ? "attach_management_override_dead" : "",
+            });
+            // One field per line: a long value then wraps inside its own line instead of
+            // running into the next field's label.
+            for (const line of [
+              t("settings.overrideList.fieldMode", { value: rootModeLabel(override.saveAttE) }),
+              t("settings.overrideList.fieldRoot", { value: shownValue(override.attachmentRoot) }),
+              t("settings.overrideList.fieldPath", { value: shownValue(override.attachmentPath) }),
+              t("settings.overrideList.fieldFormat", { value: shownValue(override.attachFormat) }),
+            ]) {
+              frag.createEl("br");
+              frag.appendText(line);
+            }
+          }),
+        )
+        .addButton((button) =>
+          button
+            .setButtonText(t("settings.overrideList.remove"))
+            .setWarning()
+            .onClick(async () => {
+              delete this.plugin.settings.overridePath[key];
+              await this.plugin.saveSettings();
+              info("ui:settings", "override removed from override list", {
+                key: key,
+                keysAfter: Object.keys(this.plugin.settings.overridePath),
+              });
+              new Notice(t("notices.overrideRemoved", { path: key }));
+              this.display();
+            }),
+        );
+    }
 
     containerEl.createEl("h3", { text: t("settings.diagnostics.name"), cls: "attach_management_tab_heading" });
 

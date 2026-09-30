@@ -41,16 +41,12 @@ available in the app when your plugin is enabled.
   margin: 0.5em 0 0.5em var(--size-4-4, 1em);
 }
 
-/* 添加按钮与卡片一起缩进一层，保持左对齐；「例外」标题不缩进，与上方四项同一条左基准线 */
-.attach_management_exception_area > .setting-item:not(.attach_management_exception_head) {
-  margin-left: var(--size-4-4, 1em);
-}
-
 .attach_management_exception_card .setting-item-control {
   gap: 0.5em;
 }
 
-/* 设置项的子项：缩进到图层例外卡片内层设置项的同一条左基准线（如「子目录同此」从属于「不管理的笔记目录」）。
+/* 缩进到图层例外卡片内层设置项的左基准线：从属项（如「子目录同此」从属于「不管理的笔记目录」）
+   与例外区的添加按钮共用这一条，两处因此始终齐平。
    基准线 = 卡片外边距（.attach_management_exception_card 的 margin-left）+ 卡片内边距（同一条规则的 padding）。 */
 .attach_management_setting_indent {
   margin-left: calc(var(--size-4-4, 1em) + var(--size-4-2, 0.5em));
@@ -68,4 +64,14 @@ available in the app when your plugin is enabled.
 .attach_management_legend_active {
   color: var(--text-accent);
   font-weight: 600;
+}
+
+/* 覆盖清单：失效的覆盖项靠颜色突出，空清单用弱化文字，都不另起说明行 */
+.attach_management_override_dead {
+  color: var(--text-error);
+}
+
+.attach_management_override_empty {
+  color: var(--text-muted);
+  margin-top: 0.25em;
 }

@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-attachment-management",
-	"version": "0.12.1",
+	"version": "1.0.0",
 	"description": "Attachment paths resolved by layer — global, folder, file — each with per-extension exceptions, plus variables and auto rename.",
 	"main": "main.js",
 	"scripts": {

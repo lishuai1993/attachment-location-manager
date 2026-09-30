@@ -19,6 +19,8 @@ Install and enable the plugin, after configuration you can paste or drop attachm
 
 This plugin supports a command `Rearrange linked attachments/Rearrange all linked attachments`. If you run this command, it will rename every attachment linked in the `markdown` or `canvas` file as you configured. An attachment is any file that is not a note (`md`/`canvas` excepted) and whose extension is not listed under **Excluded from attachments**; this is the same range the paste/drop pipeline handles.
 
+When several notes link to the same attachment but resolve it to different paths, the command gives each note its own file instead of dragging one file around — see [Q4](#faq).
+
 ![SCR-20230511-rrtk](./images/SCR-20230511-rrtk.png)
 
 **Notice**: The `Rearrange linked attachments/Rearrange all linked attachments` is currently an experimental feature; if you want to try it out, it's best to back up your files first.
@@ -139,6 +141,12 @@ By default, the "Unmanaged note folders" will only work on the folder you added,
 
 > **The path is case-sensitive and should not have a leading slash '/' at the beginning.**
 
+### Overrides
+
+Every file and folder you have overridden is listed here with its type and its four settings, so a cross-layer override is visible from the settings page and not only through the right-click menu.
+
+An override is only used while it can still match: the path must still exist, and the type it was stored as must still fit what is at that path. A row whose target is gone, or whose type no longer fits, is flagged in red — that override is dead and its target falls back to the global default. Use **Remove this override** on a row to delete it.
+
 ### Known Issues
 
 - ~~No support for processing duplicated file names right now (in development). In backup, you could use the data variable [`x`](https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format/) to use Unix timestamp with millisecond as filename (it will prevent duplicated filename).~~
@@ -164,3 +172,13 @@ A2: Yes. Every non-note file (`md`/`canvas` excepted) is handled, whatever its t
 Q3: The link of the attachment in markdown file is not updated after I directly rename the attachment file, why?
 
 A3: Make sure you have enabled the "Automatically Rename Attachment" option in the plugin setting, and **"Files and links -> Automatically update internal links"** in Obsidian setting.
+
+Q4: What happens if several notes link to the same attachment?
+
+A4: The rearrange commands first work out, for each linked note, the full target path the attachment would have under that note's own settings (including any per-file or per-folder override and extension special case).
+
+- One note links to it: the file is moved, as before.
+- Several notes, all resolving to the same path: one file stays and every note links to it.
+- Several notes resolving to different paths: each distinct path gets its own file. The original goes to the note you ran the command from — or, for `Rearrange all linked attachments`, to the first path in alphabetical order — and every other distinct path gets a copy. Each note's link is then pointed at its own file.
+
+Because the outcome is decided from the whole set of links before anything is moved, running the command twice is safe: the second run finds every file already in place and changes nothing.

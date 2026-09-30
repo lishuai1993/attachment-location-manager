@@ -2,6 +2,7 @@
 	"id": "attachment-management-plus",
 	"name": "Attachment Management Plus",
 	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
 	"description": "Attachment paths resolved by layer — global, folder, file — each with per-extension exceptions, plus variables and auto rename.",
 	"author": "lishuai1993",
 	"authorUrl": "https://github.com/lishuai1993/attachment-management.git",
