@@ -1,4 +1,4 @@
-import { DataAdapter, TFile, normalizePath } from "obsidian";
+import { App, DataAdapter, TFile, normalizePath } from "obsidian";
 import { AttachmentManagementPluginSettings, AttachmentPathSettings, DEFAULT_SETTINGS } from "./settings";
 import {
   SETTINGS_VARIABLES_DATES,
@@ -19,6 +19,9 @@ import { debugLog } from "../lib/log";
  * Metadata of notes file
  */
 class Metadata {
+  /** the plugin's own App reference, needed to read Obsidian's own attachment folder setting */
+  app: App;
+
   /** path of file */
   path: string;
 
@@ -40,6 +43,7 @@ class Metadata {
   attachmentFile?: TFile;
 
   constructor(
+    app: App,
     path: string,
     name: string,
     basename: string,
@@ -48,6 +52,7 @@ class Metadata {
     parentName: string,
     attachmentFile?: TFile,
   ) {
+    this.app = app;
     this.path = path;
     this.name = name;
     this.basename = basename;
@@ -123,7 +128,7 @@ class Metadata {
       const { extSetting } = getExtensionOverrideSetting(this.attachmentFile.extension, setting);
       if (extSetting !== undefined) {
         const fields = resolveExtensionFields(setting, extSetting);
-        root = getRootPath(this.parentPath, fields);
+        root = getRootPath(this.parentPath, fields, this.app);
         attachPath = path.join(
           root,
           fields.attachmentPath
@@ -136,7 +141,7 @@ class Metadata {
       }
     }
 
-    root = getRootPath(this.parentPath, setting);
+    root = getRootPath(this.parentPath, setting, this.app);
     debugLog("getAttachmentPath - root", root);
     attachPath = path.join(
       root,
@@ -154,14 +159,15 @@ class Metadata {
  * Returns a new instance of Metadata for the given file path.
  *
  * @param {string} file - The full path to the file.
+ * @param {App} app - the plugin's own App reference.
  * @return {Metadata} A new instance of Metadata containing information about the file.
  */
-export function getMetadata(file: string, attach?: TFile): Metadata {
+export function getMetadata(file: string, app: App, attach?: TFile): Metadata {
   const parentPath = path.dirname(file);
   const parentName = path.basename(parentPath);
   const name = path.basename(file);
   const extension = path.extname(file);
   const basename = path.basename(file, extension);
 
-  return new Metadata(file, name, basename, extension, parentPath, parentName, attach);
+  return new Metadata(app, file, name, basename, extension, parentPath, parentName, attach);
 }

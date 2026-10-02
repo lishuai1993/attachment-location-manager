@@ -17,27 +17,19 @@ export class ConfirmModal extends Modal {
     contentEl.empty();
 
     const header = contentEl.createDiv({ cls: "amg-confirm-header" });
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.gap = "8px";
-    header.style.marginBottom = "12px";
 
     const iconEl = header.createSpan({ cls: "amg-confirm-icon" });
-    iconEl.style.color = "var(--color-orange)";
-    iconEl.style.display = "inline-flex";
     setIcon(iconEl, "alert-triangle");
 
     header.createEl("h3", {
       text: t("confirm.title"),
       cls: "amg-confirm-title",
-    }).style.margin = "0";
+    });
 
-    const message = contentEl.createEl("p", {
+    contentEl.createEl("p", {
       text: t("confirm.message"),
       cls: "amg-confirm-message",
     });
-    message.style.margin = "0 0 16px 0";
-    message.style.lineHeight = "1.5";
 
     new Setting(contentEl)
       .addButton((btn) => {
@@ -58,7 +50,7 @@ export class ConfirmModal extends Modal {
               .then((result) => new Notice(arrangeResultNotice(result)))
               .catch((err) => {
                 error("ui:confirm", "rearrange all links failed", { err: err });
-                new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`);
+                new Notice(`${t("notices.error.unknownError")}: ${err instanceof Error ? err.message : String(err)}`);
               })
               .finally(() => this.close());
           }),

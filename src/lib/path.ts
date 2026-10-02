@@ -29,7 +29,7 @@ export const path = {
   // A simple function to get the dirname of a path
   // Trailing slashes are ignored. Leading slash is preserved.
   dirname(filepath: string): string {
-    return this.join(filepath, "..");
+    return path.join(filepath, "..");
   },
 
   // returns the last part of a path, e.g. 'foo.jpg'

@@ -3,16 +3,8 @@ import { AbstractInputSuggest, App, TFolder } from "obsidian";
 /**
  * Attach vault-folder autocomplete to a text input, the way Obsidian's own
  * "Attachment folder path" setting behaves.
- *
- * `AbstractInputSuggest` is @since 1.4.10 and `manifest.json` declares no
- * `minAppVersion`, so the base class is feature-detected: on an older Obsidian the
- * input stays a plain text box instead of breaking the whole settings tab.
  */
 export function attachFolderSuggest(app: App, inputEl: HTMLInputElement, onPick: (path: string) => void): void {
-  if (typeof AbstractInputSuggest !== "function") {
-    return;
-  }
-
   const folderPaths = (): string[] =>
     app.vault
       .getAllLoadedFiles()

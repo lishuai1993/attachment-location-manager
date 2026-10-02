@@ -86,7 +86,7 @@ export function getParentFolder(rf: TFile) {
 export async function md5sum(adapter: DataAdapter, file: TFile): Promise<string> {
   const md5 = new Md5();
 
-  if (!adapter.exists(file.path, true)) {
+  if (!(await adapter.exists(file.path, true))) {
     return "";
   }
 

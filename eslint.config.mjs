@@ -1,6 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
-import importPlugin from "eslint-plugin-import";
+import importPlugin from "eslint-plugin-import-x";
 import unusedImports from "eslint-plugin-unused-imports";
 import prettierRecommended from "eslint-plugin-prettier/recommended";
 
@@ -16,7 +16,7 @@ export default [
     languageOptions: {
       sourceType: "module",
       globals: {
-        process: "readonly",
+        __BUILD_ENV__: "readonly",
         window: "readonly",
         document: "readonly",
         console: "readonly",

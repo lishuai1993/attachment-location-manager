@@ -7,9 +7,11 @@ available in the app when your plugin is enabled.
 
 /* 设置页的各级标题与下方内容左对齐：Obsidian 给 .vertical-tab-content 的标题留了左右 16px 内边距，
    而设置项的边框盒子是从 0 起算的，标题因此比内容右移一格。
-   选择器必须写成两段以压过 Obsidian 的 .vertical-tab-content h2（1 类 + 1 元素 = 0,1,1）。 */
+   标题现由 Setting.setHeading() 生成，落到 .setting-item 上而非 h2/h3，故一并去掉设置项自带的分隔线，
+   与原先的原生标题视觉一致。两段选择器用于压过 Obsidian 自身的标题与设置项规则。 */
 .vertical-tab-content .attach_management_tab_heading {
   padding-left: 0;
+  border-top: none;
 }
 
 /* 层容器：只留一个小标题，不加外框——从属关系由顺序与标题文字承担 */
@@ -74,4 +76,97 @@ available in the app when your plugin is enabled.
 .attach_management_override_empty {
   color: var(--text-muted);
   margin-top: 0.25em;
+}
+
+/* 确认弹窗：结构样式全部走类，代码侧只负责开关类名 */
+.amg-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.amg-confirm-icon {
+  color: var(--color-orange);
+  display: inline-flex;
+}
+
+.amg-confirm-title {
+  margin: 0;
+}
+
+.amg-confirm-message {
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+/* 声明式设置页（Obsidian 1.13 起）。有两处默认行为与改造前的观感不符，须逐条复位：
+   其一，渲染器把连续的非容器定义自动并进一个隐式组，多个区块于是共用同一张卡片；
+   其二，组内的行被 .setting-items 这张卡片收编并拍平（透明、无边框、左内边距取
+   --setting-items-padding-x = 20px），组标题却取 --size-4-4 = 16px，两者差一格。
+   settings.ts 已把每个区块改成显式组并加 .attach_management_section（层容器另带
+   .attach_management_layer），以下规则据此把组卡片拆回「一行一卡」，把组标题的左基准线
+   拉回 0，与组内卡片的边框对齐——即本插件改造前（1.13 命令式渲染）的观感。
+   1.12 及更早的 DOM 里没有 .setting-group，以下规则不参与渲染，对本机（1.12.4）零影响。 */
+.setting-group.attach_management_section > .setting-items {
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+/* 标题与自身内容的间距收到 8px（默认是 16px 外边距 + 16px 内边距，合起来看着 32px），
+   区块之间拉开到 32px（默认 24px）——两者不再等距，标题由此明确「统领」其下内容，
+   而不是浮在两块之间。内边距必须归零：它会把标题的文字推离自己的卡片。 */
+.setting-group.attach_management_section > .setting-item-heading {
+  padding: 0;
+  margin-bottom: var(--size-4-2, 0.5em);
+}
+
+.setting-group.attach_management_section .setting-item:not(.setting-item-heading) {
+  background-color: var(--setting-items-background);
+  border: var(--setting-items-border-width) solid var(--setting-items-border-color);
+  border-radius: var(--setting-items-radius);
+  padding: var(--size-4-4, 1em);
+  margin-bottom: var(--size-4-2, 0.5em);
+}
+
+.setting-group.attach_management_section .setting-item:not(.setting-item-heading)::before {
+  content: none;
+}
+
+.setting-group.attach_management_section + .setting-group.attach_management_section {
+  margin-top: var(--size-4-8, 2em);
+}
+
+/* 收尾那张卡的底边距会与区块间距叠加：以卡片结尾的区块因此比别人多 8px。
+   末张卡之后没有同组兄弟，去掉它，各区块间距才一致。 */
+.setting-group.attach_management_section > .setting-items > .setting-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 承载原生内容的行（顺序图例、特例区、空清单）只是容器，不该长成一张设置卡片；
+   排在组内时左基准线与组标题一致，特例区与「子目录同此」的相对缩进由各条既有规则承担。 */
+.setting-group.attach_management_section > .setting-items > .setting-item.attach_management_raw_row {
+  display: block;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.setting-item.attach_management_raw_row > .setting-item-info {
+  display: none;
+}
+
+/* 设置项内联校验提示：红字右对齐，排在输入框之前 */
+.setting-item .amg-setting-error {
+  color: var(--color-red);
+  margin-right: 8px;
+  text-align: right;
+}
+
+/* 校验未通过的输入框描红边。两段选择器（类 + 元素 + 类）用于压过 Obsidian 给 input 的边框规则 */
+.setting-item input.amg-input-invalid {
+  border: 1px solid var(--color-red);
 }

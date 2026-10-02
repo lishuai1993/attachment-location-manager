@@ -1,7 +1,9 @@
 CLAUDE.md
 
 # vscode
-.vscode 
+.vscode
+# Local History extension writes its snapshots here
+.lh
 
 # Intellij
 *.iml

@@ -23,6 +23,9 @@ export enum LogLevel {
 /** Structured payload of a log line; each entry becomes `key=value`. */
 export type LogData = Record<string, unknown>;
 
+/** Replaced with a string literal by esbuild's `define`, so `process` never reaches the bundle. */
+declare const __BUILD_ENV__: string;
+
 const PREFIX = "AMG";
 const LOG_FILE_NAME = "log.txt";
 const BAK_FILE_NAME = "log.txt.bak";
@@ -110,8 +113,7 @@ export function warnOnce(key: string, tag: string, message: string, data?: LogDa
 export async function initLogger(targetApp: App, options: LoggerOptions): Promise<void> {
   app = targetApp;
   verbose = options.verbose;
-  const configDir = options.configDir || ".obsidian";
-  const logDir = normalizePath(`${configDir}/plugins/${options.pluginId}`);
+  const logDir = normalizePath(`${options.configDir}/plugins/${options.pluginId}`);
   logPath = normalizePath(`${logDir}/${LOG_FILE_NAME}`);
   bakPath = normalizePath(`${logDir}/${BAK_FILE_NAME}`);
   sinkDisabled = false;
@@ -129,7 +131,7 @@ export async function initLogger(targetApp: App, options: LoggerOptions): Promis
 
   info("sys:log", "plugin load", {
     version: options.version,
-    buildEnv: process.env.BUILD_ENV === "production" ? "production" : "development",
+    buildEnv: __BUILD_ENV__ === "production" ? "production" : "development",
     debugLogEnabled: options.verbose,
     logPath,
   });
@@ -282,6 +284,9 @@ function serialize(value: unknown, depth = 0): string {
   if (typeof value === "function") {
     return "function";
   }
+  if (typeof value === "symbol" || typeof value === "bigint") {
+    return String(value);
+  }
   // Depth cap so a self-referencing object cannot recurse forever. Only the shape of
   // the value matters for triage, not its full contents.
   if (depth >= MAX_SERIALIZE_DEPTH) {
@@ -297,7 +302,9 @@ function serialize(value: unknown, depth = 0): string {
     const entries = Object.entries(value as Record<string, unknown>).map(([k, v]) => `${k}:${serialize(v, depth + 1)}`);
     return `{${entries.join(",")}}`;
   }
-  return String(value);
+  // Only a host object with no plain-object shape reaches here; naming its type is more
+  // useful than letting it read as "[object Object]".
+  return `[${typeof value}]`;
 }
 
 function quote(value: string): string {

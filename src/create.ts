@@ -95,7 +95,7 @@ export class CreateHandler {
     // No extension gate here: the attachment range is decided once, when the file
     // enters the queue (see the `create` handler), and this pipeline must match it.
 
-    const metadata = getMetadata(source.path, attach);
+    const metadata = getMetadata(source.path, this.app, attach);
     debugLog("processAttach - metadata:", metadata);
 
     const attachPath = metadata.getAttachmentPath(setting);
@@ -118,8 +118,8 @@ export class CreateHandler {
             }
           })
           .finally(() => {
-            const attachPathFolder = this.app.vault.getAbstractFileByPath(attachPath) as TFolder;
-            if (attachPathFolder === null || !(attachPathFolder instanceof TFolder)) {
+            const attachPathFolder = this.app.vault.getAbstractFileByPath(attachPath);
+            if (!(attachPathFolder instanceof TFolder)) {
               error("res:path", "target folder missing after mkdir", {
                 note: source.path,
                 attach: attach.path,

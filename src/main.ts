@@ -294,7 +294,7 @@ export default class AttachmentManagementPlugin extends Plugin {
 
             await new ArrangeHandler(this.settings, this.app).rearrangeAttachment(RearrangeType.FILE, file, oldPath);
 
-            const oldMetadata = getMetadata(oldPath);
+            const oldMetadata = getMetadata(oldPath, this.app);
             const oldAttachPath = oldMetadata.getAttachmentPath(setting);
             this.app.vault.adapter
               .exists(oldAttachPath, true)
@@ -342,7 +342,7 @@ export default class AttachmentManagementPlugin extends Plugin {
           }
 
           if (file instanceof TFile) {
-            const oldMetadata = getMetadata(file.path);
+            const oldMetadata = getMetadata(file.path, this.app);
             const { setting } = getOverrideSetting(this.settings, file);
             const oldAttachPath = oldMetadata.getAttachmentPath(setting);
             this.app.vault.adapter
@@ -400,7 +400,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     });
   }
 
-  async overrideConfiguration(file: TAbstractFile, setting: AttachmentPathSettings) {
+  overrideConfiguration(file: TAbstractFile, setting: AttachmentPathSettings): void {
     new OverrideModal(this, file, setting).open();
   }
 
@@ -547,7 +547,7 @@ export default class AttachmentManagementPlugin extends Plugin {
    */
   initCommands() {
     this.addCommand({
-      id: "attachment-location-manager-rearrange-all-links",
+      id: "rearrange-all-links",
       name: t("commands.rearrangeAllLinks"),
       callback: async () => {
         info("cmd:arrange", "command invoked", {
@@ -560,7 +560,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "attachment-location-manager-rearrange-active-links",
+      id: "rearrange-active-links",
       name: t("commands.rearrangeActiveLinks"),
       callback: async () => {
         const activeFile = getActiveFile(this.app);
@@ -580,13 +580,13 @@ export default class AttachmentManagementPlugin extends Plugin {
           .then((result) => new Notice(arrangeResultNotice(result)))
           .catch((err) => {
             error("cmd:arrange", "rearrange failed", { command: "rearrangeActiveLinks", err: err });
-            new Notice(`${t("notices.error.unknownError")}: ${err?.message ?? err}`);
+            new Notice(`${t("notices.error.unknownError")}: ${err instanceof Error ? err.message : String(err)}`);
           });
       },
     });
 
     this.addCommand({
-      id: "attachment-location-manager-override-setting",
+      id: "override-setting",
       name: t("commands.overrideSetting"),
       checkCallback: (checking: boolean) => {
         const file = getActiveFile(this.app);
@@ -621,7 +621,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     // is refreshed whenever the active note changes. With no note open the path is empty,
     // but `checkCallback` hides the command in that state, so the empty name is never shown.
     const resetOverrideCommand = this.addCommand({
-      id: "attachment-location-manager-reset-override-setting",
+      id: "reset-override-setting",
       name: t("commands.resetOverrideSetting", { path: getActiveFile(this.app)?.path ?? "" }),
       checkCallback: (checking: boolean) => {
         const file = getActiveFile(this.app);
@@ -682,7 +682,7 @@ export default class AttachmentManagementPlugin extends Plugin {
     );
 
     this.addCommand({
-      id: "attachment-location-manager-clear-unused-originalname-storage",
+      id: "clear-unused-originalname-storage",
       name: t("commands.clearUnusedStorage"),
       callback: async () => {
         // An async command callback's rejection is not observed by Obsidian, so without
@@ -719,14 +719,16 @@ export default class AttachmentManagementPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // `loadData` is typed `any`; narrow it to what the stored shape can actually be.
+    const data = (await this.loadData()) as Partial<AttachmentManagementPluginSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
   }
 
-  async onunload() {
+  onunload(): void {
     info("sys:log", "plugin unload", { queueLen: this.createdQueue.length });
     flushLog();
     // Clear the queue of created file.

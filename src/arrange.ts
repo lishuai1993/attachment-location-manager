@@ -147,7 +147,7 @@ export class ArrangeHandler {
       }
 
       // create attachment path if it's not exists
-      const md = getMetadata(obNote);
+      const md = getMetadata(obNote, this.app);
       const attachPath = md.getAttachmentPath(setting);
       info("cmd:arrange", "note plan", {
         note: obNote,
@@ -159,11 +159,11 @@ export class ArrangeHandler {
       if (!(await this.app.vault.adapter.exists(attachPath, true))) {
         // process the case where rename the filename to uppercase or lowercase
         if (oldPath != undefined && (await this.app.vault.adapter.exists(attachPath, false))) {
-          const mdOld = getMetadata(oldPath);
+          const mdOld = getMetadata(oldPath, this.app);
           const attachPathOld = mdOld.getAttachmentPath(setting);
           // this will trigger the rename event and cause the path of attachment change
           info("res:path", "renaming attachment folder case", { from: attachPathOld, to: attachPath });
-          this.app.vault.adapter.rename(attachPathOld, attachPath);
+          await this.app.vault.adapter.rename(attachPathOld, attachPath);
         } else {
           await this.app.vault.adapter.mkdir(attachPath);
           info("res:path", "attachment folder created", { path: attachPath, note: obNote });
@@ -212,7 +212,7 @@ export class ArrangeHandler {
           continue;
         }
 
-        const metadata = getMetadata(obNote, linkFile);
+        const metadata = getMetadata(obNote, this.app, linkFile);
         const attachName = await metadata.getAttachFileName(
           setting,
           this.pluginSettings.dateFormat,
@@ -329,7 +329,7 @@ export class ArrangeHandler {
           continue;
         }
         const { setting } = getOverrideSetting(this.pluginSettings, noteFile);
-        const metadata = getMetadata(notePath, attachFile);
+        const metadata = getMetadata(notePath, this.app, attachFile);
         const attachPathForNote = metadata.getAttachmentPath(setting);
         const attachName = await metadata.getAttachFileName(
           setting,
@@ -716,10 +716,10 @@ export class ArrangeHandler {
       // suppose the ${notename} was in format
       const noNoteNameAttachFormat = settings.attachFormat.split(SETTINGS_VARIABLES_NOTENAME);
       if (settings.attachFormat.includes(SETTINGS_VARIABLES_DATES)) {
-        for (const formatPart in noNoteNameAttachFormat) {
+        for (const formatPart of noNoteNameAttachFormat) {
           // suppose the ${date} was in format, split each part and search in linkName
           const splited = formatPart.split(SETTINGS_VARIABLES_DATES);
-          for (const part in splited) {
+          for (const part of splited) {
             if (!linkName.includes(part)) {
               return true;
             }

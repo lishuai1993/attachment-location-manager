@@ -120,7 +120,7 @@ export function renderExceptionArea(container: HTMLElement, opts: ExceptionAreaO
     if (inputEl === undefined) {
       return;
     }
-    inputEl.style.border = invalid ? "1px solid var(--color-red)" : "";
+    inputEl.toggleClass("amg-input-invalid", invalid);
   };
 
   const addInheritableText = (

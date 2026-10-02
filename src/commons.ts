@@ -1,4 +1,4 @@
-import { App, DataAdapter, TFile, TextFileView, normalizePath } from "obsidian";
+import { App, DataAdapter, TFile, TextFileView, Vault, normalizePath } from "obsidian";
 import { SETTINGS_ROOT_INFOLDER, SETTINGS_ROOT_NEXTTONOTE } from "./lib/constant";
 import { path } from "./lib/path";
 import { AttachmentPathSettings } from "./settings/settings";
@@ -26,21 +26,27 @@ export function getActiveView(app: App): TextFileView | null {
   return app.workspace.getActiveViewOfType(TextFileView);
 }
 
+/** `Vault.getConfig` is not in the public typings, but it is where Obsidian keeps its own attachment folder path. */
+type VaultWithConfig = Vault & { getConfig(key: string): unknown };
+
 /**
  * Get root path to save attachment file
  * @param notePath - path of note
  * @param setting
+ * @param app - the plugin's own App reference
  * @returns root path to save attachment file
  */
 export function getRootPath(
   notePath: string,
   setting: Pick<AttachmentPathSettings, "saveAttE" | "attachmentRoot">,
+  app: App,
 ): string {
   let root: string;
 
-  //@ts-ignore
-  const obsmediadir = app.vault.getConfig("attachmentFolderPath");
-  // debugLog("obsmediadir", obsmediadir);
+  // `getConfig` is untyped: only a string is a usable folder path, so a missing key or an
+  // unexpected shape falls back to the vault root instead of stringifying into a bogus path.
+  const configuredFolder = (app.vault as VaultWithConfig).getConfig("attachmentFolderPath");
+  const obsmediadir = typeof configuredFolder === "string" ? configuredFolder : "/";
   switch (setting.saveAttE) {
     case `${SETTINGS_ROOT_INFOLDER}`:
       root = path.join(setting.attachmentRoot);
