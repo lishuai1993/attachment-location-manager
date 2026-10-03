@@ -111,6 +111,8 @@ export const en = {
         name: "Write diagnostic log",
         desc: "Write a diagnostic log to {path} for troubleshooting. WARN and ERROR entries are always recorded; turning this on also records INFO and TRACE entries. Every plugin reload rotates the log to log.txt.bak and clears the current file.",
       },
+      disabled:
+        "File logging is off for this session: the log folder {path} could not be written. WARN and ERROR entries still go to the console.",
     },
   },
 
@@ -143,6 +145,7 @@ export const en = {
     arrangeSummary: "Arrange finished: {moved} moved, {copied} copied, {skipped} skipped, {failed} failed",
     noActiveNote: "Open a note or canvas first",
     resetAttachmentSetting: "Removed the override of {path}",
+    logSinkDisabled: "Diagnostic log disabled: {reason}",
     error: {
       unknownError: "An unknown error occurred",
     },

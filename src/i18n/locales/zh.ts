@@ -111,6 +111,7 @@ export const zhCn = {
         name: "写入诊断日志",
         desc: "将诊断日志写入 {path} 以便排查问题。WARN 与 ERROR 始终记录；开启后还会记录 INFO 与 TRACE。插件每次重载都会将日志轮转为 log.txt.bak 并清空当前文件。",
       },
+      disabled: "本次会话文件日志已停用：日志目录 {path} 无法写入。WARN 与 ERROR 仍会输出到控制台。",
     },
   },
 
@@ -142,6 +143,7 @@ export const zhCn = {
     arrangeSummary: "整理完成：移动 {moved}，复制 {copied}，跳过 {skipped}，失败 {failed}",
     noActiveNote: "请先打开一篇笔记或 canvas",
     resetAttachmentSetting: "已移除 {path} 的覆盖",
+    logSinkDisabled: "诊断日志已停用：{reason}",
     error: {
       unknownError: "发生未知错误",
     },

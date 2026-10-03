@@ -45,18 +45,24 @@ export default class AttachmentManagementPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
 
+    // Before the logger: a sink failure raises a Notice, which needs the translations.
+    initI18n();
+
     // Bootstrap diagnostics first so the reload rotation and the load banner are
-    // the first thing in the log. Failures degrade to console-only output.
+    // the first thing in the log. A sink failure degrades to console-only output and
+    // reports itself through `onSinkFailure` rather than passing silently.
     setLogEnabled(this.settings.debugLogEnabled);
     await initLogger(this.app, {
-      pluginId: this.manifest.id,
+      // `manifest.dir` is the folder Obsidian actually loaded the plugin from. Composing
+      // it from `manifest.id` points at a folder that need not exist, and a log write
+      // into a missing folder fails silently for the whole session.
+      pluginDir: this.manifest.dir ?? `${this.app.vault.configDir}/plugins/${this.manifest.id}`,
       version: this.manifest.version,
-      configDir: this.app.vault.configDir,
       verbose: this.settings.debugLogEnabled,
+      onSinkFailure: (reason) => {
+        new Notice(t("notices.logSinkDisabled", { reason }));
+      },
     });
-
-    // Initilize i18n
-    initI18n();
 
     info("sys:log", "plugin loading", {
       version: this.manifest.version,

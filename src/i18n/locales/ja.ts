@@ -112,6 +112,8 @@ export const ja = {
         name: "診断ログを書き出す",
         desc: "トラブルシューティング用の診断ログを {path} に書き出します。WARN と ERROR は常に記録され、オンにすると INFO と TRACE も記録されます。プラグインの再読み込みごとにログは log.txt.bak にローテートされ、現在のファイルは消去されます。",
       },
+      disabled:
+        "このセッションではファイルログは無効です：ログフォルダー {path} に書き込めません。WARN と ERROR は引き続きコンソールに出力されます。",
     },
   },
 
@@ -143,6 +145,7 @@ export const ja = {
     arrangeSummary: "整理が完了しました：移動 {moved}、コピー {copied}、スキップ {skipped}、失敗 {failed}",
     noActiveNote: "先にノートまたは canvas を開いてください",
     resetAttachmentSetting: "{path} の上書きを削除しました",
+    logSinkDisabled: "診断ログを無効化しました：{reason}",
     error: {
       unknownError: "不明なエラーが発生しました",
     },

@@ -3,10 +3,13 @@ import { App, normalizePath } from "obsidian";
 /**
  * Leveled diagnostic logger with a console sink and a file sink.
  *
- * File sink writes to `<configDir>/plugins/<pluginId>/log.txt`. The config dir is
- * deliberately used instead of the vault root: it is not indexed by the Vault, so
- * creating/rotating the log file does NOT emit `create`/`rename`/`delete` events.
- * Writing the log into the vault root would push it into the plugin's own
+ * File sink writes to `<pluginDir>/log.txt`, where `pluginDir` is the folder Obsidian
+ * actually loaded the plugin from (`manifest.dir`). Composing that path from
+ * `manifest.id` instead breaks as soon as the folder is named differently from the id,
+ * and writing into a folder that does not exist throws with no visible symptom.
+ * The config dir is deliberately used instead of the vault root: it is not indexed by
+ * the Vault, so creating/rotating the log file does NOT emit `create`/`rename`/`delete`
+ * events. Writing the log into the vault root would push it into the plugin's own
  * `createdQueue`, where it can never match a note link and would permanently block
  * the paste pipeline.
  *
@@ -35,11 +38,14 @@ const MAX_SERIALIZE_DEPTH = 4;
 const QUOTE_REGEX = /[\s"=,\\]/;
 
 let app: App | null = null;
+let logDir = "";
 let logPath = "";
 let bakPath = "";
 let verbose = false;
 let sinkDisabled = false;
 let sinkFailureReported = false;
+let recoveryAttempted = false;
+let onSinkFailure: ((reason: string) => void) | null = null;
 let pending: string[] = [];
 let flushTimer: number | null = null;
 let writeChain: Promise<void> = Promise.resolve();
@@ -47,15 +53,22 @@ let bytesWritten = 0;
 const onceSeen = new Map<string, number>();
 
 export interface LoggerOptions {
-  pluginId: string;
+  /** Vault-relative plugin folder; the log files live directly inside it. */
+  pluginDir: string;
   version: string;
-  configDir: string;
   verbose: boolean;
+  /** Called once if the file sink gives up, so the failure is not console-only. */
+  onSinkFailure?: (reason: string) => void;
 }
 
 /** Absolute-in-vault path of the current log file, empty before `initLogger` runs. */
 export function getLogPath(): string {
   return logPath;
+}
+
+/** True once the file sink has stopped for this session; the console sink keeps working. */
+export function isSinkDisabled(): boolean {
+  return sinkDisabled;
 }
 
 export function setLogEnabled(value: boolean): void {
@@ -107,17 +120,20 @@ export function warnOnce(key: string, tag: string, message: string, data?: LogDa
 
 /**
  * Point the logger at the plugin folder, rotate the previous run's log into
- * `log.txt.bak`, truncate `log.txt` and write the load banner. Any failure here
- * degrades to console-only output and never propagates to the caller.
+ * `log.txt.bak`, truncate `log.txt` and write the load banner. A failure to write
+ * degrades the file sink to console-only output and never propagates to the caller;
+ * a failed first write is retried once after creating the folder.
  */
 export async function initLogger(targetApp: App, options: LoggerOptions): Promise<void> {
   app = targetApp;
   verbose = options.verbose;
-  const logDir = normalizePath(`${options.configDir}/plugins/${options.pluginId}`);
+  logDir = normalizePath(options.pluginDir);
   logPath = normalizePath(`${logDir}/${LOG_FILE_NAME}`);
   bakPath = normalizePath(`${logDir}/${BAK_FILE_NAME}`);
   sinkDisabled = false;
   sinkFailureReported = false;
+  recoveryAttempted = false;
+  onSinkFailure = options.onSinkFailure ?? null;
   pending = [];
   bytesWritten = 0;
   writeChain = Promise.resolve();
@@ -206,7 +222,45 @@ function flushNow(): void {
   const chunk = pending.join("");
   pending = [];
   // Serialize writes so lines keep their order even though `append` is async.
-  writeChain = writeChain.then(() => writeChunk(chunk)).catch((err) => handleSinkFailure(err));
+  writeChain = writeChain.then(() => writeChunk(chunk)).catch((err) => recoverSink(chunk, err));
+}
+
+/**
+ * A write failed. The commonest cause is a log folder that does not exist — the path is
+ * composed from a plugin folder, and a folder named differently from its manifest id
+ * leaves `write` with nowhere to go. `DataAdapter.write` does not create parents, so try
+ * once to create the folder and replay the chunk; only a second failure gives up.
+ */
+async function recoverSink(chunk: string, err: unknown): Promise<void> {
+  if (!recoveryAttempted) {
+    recoveryAttempted = true;
+    if (await ensureLogDir()) {
+      try {
+        await writeChunk(chunk);
+        return;
+      } catch (retryErr) {
+        err = retryErr;
+      }
+    }
+  }
+  handleSinkFailure(err);
+}
+
+/** Create the log folder if it is missing. `mkdir` throws when it already exists, hence the check. */
+async function ensureLogDir(): Promise<boolean> {
+  const adapter = app?.vault.adapter;
+  if (adapter === undefined || logDir === "") {
+    return false;
+  }
+  try {
+    if (await adapter.exists(logDir)) {
+      return true;
+    }
+    await adapter.mkdir(logDir);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function writeChunk(chunk: string): Promise<void> {
@@ -242,6 +296,9 @@ function handleSinkFailure(err: unknown): void {
   sinkFailureReported = true;
   const reason = err instanceof Error ? err.message : String(err);
   console.warn(`${PREFIX}|${timestamp()}|WARN|sys:log|file sink disabled reason=${serialize(reason)}`);
+  // The console line is invisible to anyone not watching DevTools, and the settings page
+  // otherwise keeps showing a log path that nothing is writing to.
+  onSinkFailure?.(reason);
 }
 
 function timestamp(): string {

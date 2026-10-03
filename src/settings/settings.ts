@@ -29,7 +29,7 @@ import {
 } from "../utils";
 import { attachFolderSuggest } from "../lib/folderSuggest";
 import { debugLog } from "../lib/log";
-import { getLogPath, info, setLogEnabled } from "../lib/logger";
+import { getLogPath, info, isSinkDisabled, setLogEnabled } from "../lib/logger";
 import { t } from "../i18n/index";
 
 export enum SETTINGS_TYPES {
@@ -387,7 +387,12 @@ export class AttachmentManagementSettingTab extends PluginSettingTab {
   private debugLogRow(): SettingRow {
     return {
       name: t("settings.diagnostics.enable.name"),
-      desc: t("settings.diagnostics.enable.desc", { path: getLogPath() }),
+      // When the file sink gave up, saying where the log lives would imply it is being
+      // written. `isSinkDisabled` is only true in the session that failed, so a reload
+      // that recovers shows the normal description again.
+      desc: isSinkDisabled()
+        ? t("settings.diagnostics.disabled", { path: getLogPath() })
+        : t("settings.diagnostics.enable.desc", { path: getLogPath() }),
       build: (setting) => {
         this.buildDebugLog(setting);
       },
