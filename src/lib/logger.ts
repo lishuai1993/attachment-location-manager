@@ -194,7 +194,10 @@ function emitToConsole(level: LogLevel, line: string): void {
   } else if (level === LogLevel.WARN) {
     console.warn(text);
   } else {
-    console.log(text);
+    // `debug` rather than `log`: the release guideline allows only warn/error/debug, and the
+    // DevTools default view hides `debug` until "Verbose" is on — which is what verbose
+    // diagnostics should do. WARN/ERROR above stay visible without that.
+    console.debug(text);
   }
 }
 

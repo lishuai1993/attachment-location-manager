@@ -8,14 +8,17 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-const prod = process.env.BUILD_ENV === "production";
+// Development is opt-in. A bare `node esbuild.config.mjs` therefore emits the production
+// bundle, so a rebuild by anyone — a reviewer, CI, another machine — cannot silently
+// produce a sourcemapped dev build that no longer matches the released artifact.
+const dev = process.env.BUILD_ENV === "development";
 
 const context = await esbuild.context({
   banner: {
     js: banner,
   },
   define: {
-    __BUILD_ENV__: JSON.stringify(process.env.BUILD_ENV || ""),
+    __BUILD_ENV__: JSON.stringify(dev ? "development" : "production"),
   },
   entryPoints: ["src/main.ts"],
   bundle: true,
@@ -39,14 +42,14 @@ const context = await esbuild.context({
   format: "cjs",
   target: "es2018",
   logLevel: "info",
-  sourcemap: prod ? false : "inline",
+  sourcemap: dev ? "inline" : false,
   treeShaking: true,
   outfile: "main.js",
 });
 
-if (prod) {
+if (dev) {
+  await context.watch();
+} else {
   await context.rebuild();
   process.exit(0);
-} else {
-  await context.watch();
 }

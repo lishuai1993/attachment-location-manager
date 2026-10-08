@@ -1,7 +1,7 @@
 {
 	"id": "attachment-location-manager",
 	"name": "Attachment Location Manager",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"minAppVersion": "1.8.7",
 	"description": "Set attachment location per note or folder: global, folder and file settings resolve by nearest match, each with its own per-extension exceptions; supports variables, auto-rename and re-arranging existing links.",
 	"author": "lishuai1993",
